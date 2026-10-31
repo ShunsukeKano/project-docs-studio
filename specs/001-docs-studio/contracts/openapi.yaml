@@ -1,0 +1,498 @@
+openapi: 3.1.0
+info:
+  title: Docs Studio API
+  version: 1.0.0
+  description: |
+    Contract for the Docs Studio API (Phase 1 of the plan for specs/001-docs-studio).
+    The backend generates the final `openapi.json` from the running app; this file is the design contract
+    that the generated document must match (paths, operation ids, status codes, error codes).
+
+    Rules that apply to every writer operation, in this order:
+    1. Basic authentication (401, with `WWW-Authenticate: Basic`)
+    2. The article exists (404)
+    3. Input shape and field validation (422)
+    4. `expected_draft_version` matches (409 `version_conflict`), where the operation requires it
+    5. Business rules (for example 422 `empty_content`, 409 `not_published`, 409 `version_is_live`)
+
+    Public operations and `/healthz` need no authentication. Writer responses carry `Cache-Control: no-store`.
+    No response is cached.
+servers:
+  - url: /api/v1
+tags:
+  - name: writer
+    description: Writer operations. Basic authentication required.
+  - name: public
+    description: Public, unauthenticated reading of published articles.
+  - name: health
+paths:
+  /articles:
+    post:
+      tags: [writer]
+      operationId: createArticle
+      summary: Create an article (a never-published draft)
+      description: If the slug is taken, the smallest free numeric suffix (`-2`, `-3`, ...) is appended and the stored slug is returned. Two concurrent creates for one slug each get a distinct slug.
+      security: [{basicAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ArticleCreate'}
+      responses:
+        '201':
+          description: Created. The `Location` header points to the article.
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArticleDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/SlugConflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    get:
+      tags: [writer]
+      operationId: listArticles
+      summary: List all articles in any state, newest change first
+      security: [{basicAuth: []}]
+      parameters:
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/ArticleStatus'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Offset'}
+      responses:
+        '200':
+          description: A page of articles (at most 100).
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items: {$ref: '#/components/schemas/ArticleSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /articles/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/ArticleId'}
+    get:
+      tags: [writer]
+      operationId: getArticle
+      summary: Get one article, including its draft
+      security: [{basicAuth: []}]
+      responses:
+        '200':
+          description: The article.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArticleDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [writer]
+      operationId: updateArticle
+      summary: Partially update the draft
+      description: Omitted fields keep their value. `tags` replaces the whole list. The slug cannot be changed (an unknown field, including `slug`, returns 422). On success `draft_version` increases by one.
+      security: [{basicAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ArticleUpdate'}
+      responses:
+        '200':
+          description: The updated article.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArticleDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /articles/{id}/publish:
+    parameters:
+      - {$ref: '#/components/parameters/ArticleId'}
+    post:
+      tags: [writer]
+      operationId: publishArticle
+      summary: Publish the draft
+      description: |
+        One transaction, under the article's row lock. Order: version check (409), then non-empty title and body (422),
+        then the idempotent check, then the new snapshot.
+        If the draft equals the live snapshot, nothing is created (200); an unpublished article goes back to `published`.
+        Otherwise a new numbered snapshot is created (201), `published_at` is set only the first time, and `draft_version` increases.
+      security: [{basicAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExpectedVersion'}
+      responses:
+        '200':
+          description: The draft equals the live snapshot; no snapshot was created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublishResult'}
+        '201':
+          description: A new snapshot was created and is now live.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublishResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '422': {$ref: '#/components/responses/EmptyContentOrValidation'}
+  /articles/{id}/unpublish:
+    parameters:
+      - {$ref: '#/components/parameters/ArticleId'}
+    post:
+      tags: [writer]
+      operationId: unpublishArticle
+      summary: Take a published article down
+      description: Changes only `status`. Every snapshot, the live pointer, `published_at` and the draft are kept. No version check.
+      security: [{basicAuth: []}]
+      responses:
+        '200':
+          description: The article is now unpublished.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArticleDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/NotPublished'}
+  /articles/{id}/versions:
+    parameters:
+      - {$ref: '#/components/parameters/ArticleId'}
+    get:
+      tags: [writer]
+      operationId: listVersions
+      summary: Version history, newest first (without the body)
+      security: [{basicAuth: []}]
+      responses:
+        '200':
+          description: The snapshots.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/VersionSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /articles/{id}/versions/{n}:
+    parameters:
+      - {$ref: '#/components/parameters/ArticleId'}
+      - {$ref: '#/components/parameters/VersionNumber'}
+    get:
+      tags: [writer]
+      operationId: getVersion
+      summary: Full content of one snapshot
+      security: [{basicAuth: []}]
+      responses:
+        '200':
+          description: The snapshot.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VersionDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [writer]
+      operationId: deleteVersion
+      summary: Delete a snapshot that is not protected
+      description: The protected snapshot is the one the live pointer references, also after Unpublish. It is refused with 409 `version_is_live`. Takes the same row lock as Publish. No version check.
+      security: [{basicAuth: []}]
+      responses:
+        '204':
+          description: Deleted. The number is never reused.
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionIsLive'}
+  /articles/{id}/versions/{n}/restore:
+    parameters:
+      - {$ref: '#/components/parameters/ArticleId'}
+      - {$ref: '#/components/parameters/VersionNumber'}
+    post:
+      tags: [writer]
+      operationId: restoreVersion
+      summary: Copy a snapshot into the draft
+      description: |
+        Copies only title, body and tags, in one statement. It never changes `status`, the live pointer or `published_at`,
+        never publishes, and never creates, changes or deletes a snapshot. On success `draft_version` increases by one.
+      security: [{basicAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExpectedVersion'}
+      responses:
+        '200':
+          description: The article with the restored draft.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArticleDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/VersionConflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /public/articles:
+    get:
+      tags: [public]
+      operationId: listPublicArticles
+      summary: Published articles, newest publication date first
+      description: Only published articles. Never-published and unpublished articles are not listed. No authentication.
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Offset'}
+      responses:
+        '200':
+          description: A page of published articles (at most 100); an empty array when there are none.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items: {$ref: '#/components/schemas/PublicArticleListItem'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /public/articles/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: [public]
+      operationId: getPublicArticle
+      summary: One published article, from its live snapshot
+      description: Title, tags and body come from the live snapshot in one query, never from the draft. A never-published article, an unpublished article and a missing or malformed slug all return the same 404 with the same body.
+      responses:
+        '200':
+          description: The article.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicArticle'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /healthz:
+    get:
+      tags: [health]
+      operationId: healthz
+      summary: Liveness check. Does not touch the database.
+      servers:
+        - url: /
+      responses:
+        '200':
+          description: Alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: {type: boolean}
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Credentials come from BASIC_AUTH_USER and BASIC_AUTH_PASSWORD. Checked before any lookup or validation.
+  parameters:
+    ArticleId:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer, format: int64}
+    VersionNumber:
+      name: n
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+    Offset:
+      name: offset
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
+  responses:
+    Unauthorized:
+      description: Missing or wrong credentials (code `unauthorized`).
+      headers:
+        WWW-Authenticate: {schema: {type: string, example: 'Basic realm="studio"'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    NotFound:
+      description: Not found (code `not_found`). The same body for every kind of "not found".
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    ValidationError:
+      description: Invalid input (code `validation_error`). Nothing changes.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    EmptyContentOrValidation:
+      description: Invalid input (`validation_error`), or the draft's title or body is empty (`empty_content`). Nothing is created.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    VersionConflict:
+      description: The request is based on an out-of-date draft (code `version_conflict`). `details.current_draft_version` holds the current version. Nothing changes.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    SlugConflict:
+      description: Every retry of the slug numbering lost a race (code `slug_conflict`). Practically never returned.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    NotPublished:
+      description: The article is not published (code `not_published`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    VersionIsLive:
+      description: The snapshot is the protected one (code `version_is_live`). It still exists.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [unauthorized, not_found, validation_error, version_conflict, empty_content, not_published, version_is_live, slug_conflict]
+            message: {type: string}
+            details:
+              description: "Extra data. For `version_conflict`, an object with `current_draft_version` (an integer); for `validation_error`, the list of field problems."
+              type: [object, array, 'null']
+    ArticleStatus:
+      type: string
+      enum: [draft, published, unpublished]
+    Title:
+      type: string
+      minLength: 1
+      maxLength: 200
+    Slug:
+      type: string
+      minLength: 1
+      maxLength: 100
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+    Body:
+      type: string
+      maxLength: 100000
+    Tags:
+      type: array
+      maxItems: 10
+      items: {type: string, minLength: 1, maxLength: 30}
+      description: Trimmed, lowercased and without duplicates (order kept) after normalization.
+    ArticleCreate:
+      type: object
+      additionalProperties: false
+      required: [title, slug]
+      properties:
+        title: {$ref: '#/components/schemas/Title'}
+        slug: {$ref: '#/components/schemas/Slug'}
+        body: {$ref: '#/components/schemas/Body'}
+        tags: {$ref: '#/components/schemas/Tags'}
+    ArticleUpdate:
+      type: object
+      additionalProperties: false
+      required: [expected_draft_version]
+      properties:
+        expected_draft_version: {type: integer, minimum: 1}
+        title: {$ref: '#/components/schemas/Title'}
+        body: {$ref: '#/components/schemas/Body'}
+        tags: {$ref: '#/components/schemas/Tags'}
+    ExpectedVersion:
+      type: object
+      additionalProperties: false
+      required: [expected_draft_version]
+      properties:
+        expected_draft_version: {type: integer, minimum: 1}
+    ArticleSummary:
+      type: object
+      required: [id, slug, status, title, draft_version, updated_at]
+      properties:
+        id: {type: integer, format: int64}
+        slug: {type: string}
+        status: {$ref: '#/components/schemas/ArticleStatus'}
+        title: {type: string, description: The draft's title.}
+        draft_version: {type: integer}
+        updated_at: {type: string, format: date-time}
+    ArticleDetail:
+      type: object
+      required: [id, slug, status, draft_title, draft_body, draft_tags, draft_version, published_at, live_version_number, created_at, updated_at]
+      properties:
+        id: {type: integer, format: int64}
+        slug: {type: string}
+        status: {$ref: '#/components/schemas/ArticleStatus'}
+        draft_title: {type: string}
+        draft_body: {type: string}
+        draft_tags: {$ref: '#/components/schemas/Tags'}
+        draft_version: {type: integer}
+        published_at: {type: [string, 'null'], format: date-time}
+        live_version_number:
+          type: [integer, 'null']
+          description: The number of the protected (live) snapshot, or null if the article was never published.
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    PublishResult:
+      type: object
+      required: [created, version_number, status, published_at, draft_version]
+      properties:
+        created:
+          type: boolean
+          description: True when a new snapshot was created (201); false when the draft already equalled the live snapshot (200).
+        version_number: {type: integer}
+        status: {$ref: '#/components/schemas/ArticleStatus'}
+        published_at: {type: string, format: date-time}
+        draft_version: {type: integer}
+    VersionSummary:
+      type: object
+      required: [id, version_number, title, created_at, is_live]
+      properties:
+        id: {type: integer, format: int64}
+        version_number: {type: integer}
+        title: {type: string}
+        created_at: {type: string, format: date-time}
+        is_live:
+          type: boolean
+          description: True for the protected snapshot (the one the live pointer references).
+    VersionDetail:
+      type: object
+      required: [id, version_number, title, body, tags, created_at, is_live]
+      properties:
+        id: {type: integer, format: int64}
+        version_number: {type: integer}
+        title: {type: string}
+        body: {type: string}
+        tags: {$ref: '#/components/schemas/Tags'}
+        created_at: {type: string, format: date-time}
+        is_live: {type: boolean}
+    PublicArticleListItem:
+      type: object
+      required: [slug, title, tags, published_at, updated_at]
+      properties:
+        slug: {type: string}
+        title: {type: string}
+        tags: {$ref: '#/components/schemas/Tags'}
+        published_at: {type: string, format: date-time}
+        updated_at:
+          type: [string, 'null']
+          format: date-time
+          description: The live snapshot's creation time, only when the article has been republished (live version number 2 or more); otherwise null.
+    PublicArticle:
+      type: object
+      required: [slug, title, tags, body, published_at, live_created_at]
+      properties:
+        slug: {type: string}
+        title: {type: string}
+        tags: {$ref: '#/components/schemas/Tags'}
+        body: {type: string, description: Markdown. Rendered and sanitized by the frontend.}
+        published_at: {type: string, format: date-time}
+        live_created_at: {type: string, format: date-time}

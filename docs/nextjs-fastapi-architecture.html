@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Next.js × FastAPI Architecture</title>
+<style>
+:root{
+  /* Accenture-style palette: core purple as the lead colour, with black, white and grey */
+  --bg:#ffffff; --card:#ffffff; --fg:#000000; --muted:#5e5e5e; --border:#d8d3e0;
+  --fe:#a100ff; --fe-bg:#f1e6ff;      /* frontend: core purple */
+  --be:#000000; --be-bg:#ececec;      /* backend: black */
+  --db:#7500c0; --db-bg:#e6dcff;      /* database: deep purple */
+  --warn:#c8102e; --warn-bg:#fde8eb;
+  --code-bg:#efecf3;
+}
+body::before{content:"";display:block;height:8px;background:linear-gradient(90deg,#460073,#7500c0,#a100ff)}
+html{background:#ffffff;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:30px;margin:0 0 6px;letter-spacing:.01em}
+h2{font-size:22px;margin:48px 0 12px;padding-top:10px;border-top:3px solid var(--fe)}
+h3{font-size:17px;margin:28px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);margin-bottom:20px}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
+nav.toc a{font-size:13px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:var(--fg);text-decoration:none;background:var(--card)}
+nav.toc a:hover{border-color:var(--fe);color:var(--fe)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:12px 0}
+.fig{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0;overflow-x:auto}
+.fig svg{display:block;min-width:640px;width:100%;height:auto}
+.cap{font-size:13px;color:var(--muted);margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:14px;background:var(--card)}
+th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--code-bg);font-weight:600;border-bottom:2px solid var(--fe)}
+.scroll{overflow-x:auto}
+code{background:var(--code-bg);padding:1px 6px;border-radius:4px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code-bg);padding:14px;border-radius:10px;overflow-x:auto;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin:10px 0}
+pre code{background:none;padding:0}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;font-weight:600}
+.tag.fe{background:var(--fe-bg);color:var(--fe)} .tag.be{background:var(--be-bg);color:var(--be)} .tag.db{background:var(--db-bg);color:var(--db)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.layer{border:1px solid var(--border);border-left:5px solid var(--be);background:var(--card);border-radius:8px;padding:10px 14px;margin:8px 0}
+.layer b{display:block}
+.layer span{font-size:14px;color:var(--muted)}
+.layer.fe{border-left-color:var(--fe)}
+.layer.db{border-left-color:var(--db)}
+.note{border-left:4px solid var(--warn);background:var(--warn-bg);padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+.ok{border-left:4px solid var(--fe);background:var(--fe-bg);padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0}
+.flow .n{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-size:14px}
+.flow .n.fe{border-color:var(--fe);background:var(--fe-bg)} .flow .n.be{border-color:var(--be);background:var(--be-bg)}
+.flow .a{color:var(--muted)}
+.tree{font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+.bar{display:inline-block;height:10px;background:var(--fe);border-radius:3px;vertical-align:middle}
+.dot{color:var(--fe);font-weight:700}
+.none{color:var(--muted)}
+.toc a.core,nav.toc a.core{border-color:var(--fe);font-weight:600}
+details.opt{border:1px dashed var(--border);border-radius:10px;padding:8px 14px;margin:14px 0}
+details.opt>summary{cursor:pointer;font-weight:600;color:var(--muted)}
+footer{margin-top:48px;color:var(--muted);font-size:13px}
+/* svg */
+svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.t{font-size:14px;font-weight:600} .s{font-size:12px} .m{fill:var(--muted)!important}
+.b-fe{fill:var(--fe-bg);stroke:var(--fe);stroke-width:1.5}
+.b-be{fill:var(--be-bg);stroke:var(--be);stroke-width:1.5}
+.b-db{fill:var(--db-bg);stroke:var(--db);stroke-width:1.5}
+.b-n{fill:var(--card);stroke:var(--border);stroke-width:1.5}
+.b-w{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.5}
+.ln{stroke:var(--muted);stroke-width:1.6;fill:none}
+.ln.d{stroke-dasharray:6 4}
+.ll{stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 4}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Next.js × FastAPI Architecture</h1>
+<p class="lead">An overview of the setup in which the frontend (<code>frontend</code>) and the backend (<code>backend</code>) live in separate folders, and FastAPI sits under <code>src/app/</code>. It focuses on diagrams and the database structure. A Japanese version is in <code>docs/ja/</code>.</p>
+<div class="note"><b>Status of this document:</b> It is a reference for the intended structure. The confirmed specification, API and tasks for the feature itself (Docs Studio) are the Spec Kit artifacts in <code>specs/001-docs-studio/</code> (spec.md / plan.md / tasks.md). If the two disagree, <code>specs/</code> wins and this document should be updated.</div>
+<div class="ok"><b>Reading guide:</b> The parts that matter most for the assessment are marked ★: the request flow (3), the database structure (7), the state transitions and the operation matrix (8), publish and concurrency control (9), the API (10) and the test plan (12). Sections 4 to 6 support them. The deployment details in section 11 and the AI feature (excluded from the plan) are collapsed because they are not assessed.</div>
+
+<nav class="toc">
+  <a href="#overview">1. Overview</a><a href="#roles">2. Responsibilities</a><a class="core" href="#flow">★ 3. Request flow</a>
+  <a href="#backend">4. Backend structure</a><a href="#frontend">5. Frontend structure</a><a href="#types">6. Keeping types in sync</a>
+  <a class="core" href="#db">★ 7. Database structure</a><a class="core" href="#state">★ 8. Article state transitions</a><a class="core" href="#publish">★ 9. Publish and concurrency control</a>
+  <a class="core" href="#api">★ 10. API list (draft)</a><a href="#env">11. Environments and deployment</a><a class="core" href="#tests">★ 12. Test plan and build order</a>
+</nav>
+
+<!-- 1 -->
+<h2 id="overview">1. Overview</h2>
+<p>In normal operation the browser talks only to the Next.js server and never calls FastAPI directly. Tokens and internal URLs stay out of the browser, and CORS is generally not needed.</p>
+<div class="fig">
+<svg viewBox="0 0 960 285" role="img" aria-label="Overall architecture diagram">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+
+  <rect class="b-n" x="20" y="105" width="140" height="80" rx="10"/>
+  <text class="t" x="90" y="140" text-anchor="middle">Browser</text>
+  <text class="s m" x="90" y="160" text-anchor="middle">Reader / writer</text>
+
+  <rect class="b-fe" x="225" y="40" width="255" height="215" rx="12"/>
+  <text class="t" x="352" y="64" text-anchor="middle">Next.js server (frontend)</text>
+  <rect class="b-n" x="243" y="78" width="219" height="30" rx="6"/><text class="s" x="352" y="98" text-anchor="middle">proxy.ts (routing and auth challenge)</text>
+  <rect class="b-n" x="243" y="116" width="219" height="30" rx="6"/><text class="s" x="352" y="136" text-anchor="middle">Server Components (reads)</text>
+  <rect class="b-n" x="243" y="154" width="219" height="30" rx="6"/><text class="s" x="352" y="174" text-anchor="middle">Server Actions (writes)</text>
+  <rect class="b-n" x="243" y="192" width="219" height="46" rx="6"/><text class="s" x="352" y="212" text-anchor="middle">API client (openapi-fetch)</text><text class="s m" x="352" y="228" text-anchor="middle">Types generated from openapi.json</text>
+
+  <rect class="b-be" x="545" y="40" width="215" height="215" rx="12"/>
+  <text class="t" x="652" y="64" text-anchor="middle">FastAPI (backend)</text>
+  <rect class="b-n" x="563" y="78" width="179" height="34" rx="6"/><text class="s" x="652" y="100" text-anchor="middle">Router (HTTP in/out)</text>
+  <rect class="b-n" x="563" y="120" width="179" height="34" rx="6"/><text class="s" x="652" y="142" text-anchor="middle">Service (business rules)</text>
+  <rect class="b-n" x="563" y="162" width="179" height="34" rx="6"/><text class="s" x="652" y="184" text-anchor="middle">Repository (SQL)</text>
+  <rect class="b-n" x="563" y="204" width="179" height="34" rx="6"/><text class="s" x="652" y="226" text-anchor="middle">Schema (Pydantic)</text>
+
+  <path d="M830 130 v-12 a8 8 0 0 1 8 -8 h82 a8 8 0 0 1 8 8 v12" class="b-db"/>
+  <rect class="b-db" x="830" y="125" width="100" height="70" rx="0"/>
+  <ellipse class="b-db" cx="880" cy="125" rx="50" ry="12"/>
+  <ellipse class="b-db" cx="880" cy="195" rx="50" ry="12"/>
+  <text class="t" x="880" y="165" text-anchor="middle">PostgreSQL</text>
+
+  <path class="ln" marker-end="url(#ar)" marker-start="url(#ar)" d="M160 145 H225"/>
+  <text class="s m" x="192" y="132" text-anchor="middle">HTML</text><text class="s m" x="192" y="168" text-anchor="middle">Basic</text>
+  <path class="ln" marker-end="url(#ar)" marker-start="url(#ar)" d="M480 145 H545"/>
+  <text class="s m" x="512" y="132" text-anchor="middle">JSON</text><text class="s m" x="512" y="168" text-anchor="middle">Basic</text>
+  <path class="ln" marker-end="url(#ar)" marker-start="url(#ar)" d="M760 160 H830"/>
+  <text class="s m" x="795" y="148" text-anchor="middle">SQL</text>
+
+</svg>
+<div class="cap">The lines show runtime traffic. As a rule, the browser does not call FastAPI directly.</div>
+</div>
+
+<!-- 2 -->
+<h2 id="roles">2. Division of responsibilities</h2>
+<div class="scroll"><table>
+<tr><th>Area</th><th>Role</th><th>Does</th><th>Does not</th></tr>
+<tr><td><span class="tag fe">frontend</span></td><td>Presentation and a thin BFF</td><td>Screens, forwarding credentials, calling FastAPI, instant input checks (Zod)</td><td>Business logic, the final authorization decision, database access</td></tr>
+<tr><td><span class="tag be">backend</span></td><td>Sole owner of business logic and data</td><td>State transitions, enforcing invariants, transactions, authorization, final input validation (Pydantic)</td><td>Screen-specific concerns</td></tr>
+<tr><td><span class="tag db">PostgreSQL</span></td><td>Persistence and the last line of defence</td><td>Constraints (UNIQUE / CHECK / FK), transactions, history immutability (trigger)</td><td>Carrying all application rules by itself</td></tr>
+</table></div>
+
+<!-- 3 -->
+<h2 id="flow">3. Request flow</h2>
+<h3>3.1 Reading a published document (unauthenticated)</h3>
+<div class="flow">
+  <div class="n">Browser</div><span class="a">→</span>
+  <div class="n fe">Server Component<br><small>/docs/[slug]</small></div><span class="a">→</span>
+  <div class="n be">GET /public/articles/{slug}</div><span class="a">→</span>
+  <div class="n be">Service<br><small>fetches the live snapshot</small></div><span class="a">→</span>
+  <div class="n">article_versions</div>
+</div>
+<p>The draft columns (<code>draft_*</code>) are never read. For an unpublished or taken-down article, the Service raises <code>NotFoundError</code> and the response is a 404.</p>
+
+<h3>3.2 A writer publishes</h3>
+<div class="fig">
+<svg viewBox="0 0 960 445" role="img" aria-label="Publish sequence">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <g class="t">
+    <rect class="b-n" x="30" y="10" width="150" height="36" rx="8"/><text x="105" y="33" text-anchor="middle">Writer screen</text>
+    <rect class="b-fe" x="270" y="10" width="170" height="36" rx="8"/><text x="355" y="33" text-anchor="middle">Server Action</text>
+    <rect class="b-be" x="530" y="10" width="170" height="36" rx="8"/><text x="615" y="33" text-anchor="middle">FastAPI</text>
+    <rect class="b-db" x="790" y="10" width="140" height="36" rx="8"/><text x="860" y="33" text-anchor="middle">PostgreSQL</text>
+  </g>
+  <line class="ll" x1="105" y1="46" x2="105" y2="435"/><line class="ll" x1="355" y1="46" x2="355" y2="435"/>
+  <line class="ll" x1="615" y1="46" x2="615" y2="435"/><line class="ll" x1="860" y1="46" x2="860" y2="435"/>
+
+  <path class="ln" marker-end="url(#ar2)" d="M105 80 H355"/><text class="s" x="230" y="73" text-anchor="middle">"Publish" button</text>
+  <path class="ln" marker-end="url(#ar2)" d="M355 115 H615"/><text class="s" x="485" y="108" text-anchor="middle">POST /articles/{id}/publish + expected_draft_version</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 150 H860"/><text class="s" x="738" y="143" text-anchor="middle">BEGIN</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 185 H860"/><text class="s" x="738" y="178" text-anchor="middle">1. Lock the row (FOR UPDATE)</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 220 H860"/><text class="s" x="738" y="213" text-anchor="middle">2. Stale version? → 409, nothing changes</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 255 H860"/><text class="s" x="738" y="248" text-anchor="middle">3. Same as live snapshot? → 200, no-op</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 290 H860"/><text class="s" x="738" y="283" text-anchor="middle">4. Counter + 1, INSERT the snapshot</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 325 H860"/><text class="s" x="738" y="318" text-anchor="middle">5. UPDATE status / pointer / published_at</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 360 H860"/><text class="s" x="738" y="353" text-anchor="middle">COMMIT (steps 4–5 all succeed or all fail)</text>
+  <path class="ln d" marker-end="url(#ar2)" d="M615 392 H355"/><text class="s" x="485" y="385" text-anchor="middle">201 + new version (or 200 / 409 / 422)</text>
+  <path class="ln d" marker-end="url(#ar2)" d="M355 425 H105"/><text class="s" x="230" y="418" text-anchor="middle">Re-render (pages are dynamic, no cache)</text>
+</svg>
+<div class="cap">If anything fails in steps 4 and 5, the transaction is rolled back, so there is never a "published, but nothing to point at" state. The edit and Restore calls use the same lock and the same version check.</div>
+</div>
+
+<!-- 4 -->
+<h2 id="backend">4. Backend structure (backend)</h2>
+<div class="grid2">
+<div>
+<h3>Layers</h3>
+<div class="layer"><b>Router</b><span>api/v1/routes/*.py — receives input, sets response_model and status codes. No logic.</span></div>
+<div class="layer"><b>Service</b><span>domains/*/service.py — business rules, state transitions and the transaction (one session per request, one <code>async with session.begin()</code>). The only layer that commits. Never raises HTTPException. The tests target this layer.</span></div>
+<div class="layer"><b>Repository (thin, optional)</b><span>domains/*/repository.py — only the locking and snapshot SQL that is worth isolating. Pass-through wrappers around the ORM are not written. Never commits.</span></div>
+<div class="layer db"><b>Model / Schema</b><span>models.py (tables) and schemas.py (input and output types). ORM objects are never returned as they are. Sessions use <code>expire_on_commit=False</code>.</span></div>
+<p class="cap">Dependencies point one way, from top to bottom. Errors are raised as <code>AppError</code> subclasses and converted to HTTP in a single exception handler.</p>
+<h3>Secure by default</h3>
+<ul>
+  <li>Two routers: the <b>writer</b> router carries <code>dependencies=[Depends(require_basic_auth)]</code> for the whole router, and the <b>public</b> router (<code>/public/*</code>) carries none. A new writer route is therefore protected without anyone remembering to add a check.</li>
+  <li>Authentication is switched by the explicit setting <code>BASIC_AUTH_ENABLED</code>: required in production, and off by default for a local run (the example environment file turns it off) so a fresh run behaves as the assignment describes; start-up logs a warning when it is off. It is never an implicit fallback.</li>
+  <li>With authentication enabled, a test walks <code>app.routes</code> and fails if any route outside <code>/api/v1/public</code> and <code>/healthz</code> does not return 401 without credentials.</li>
+  <li>Auth is a dependency, so it runs before body validation: 401 comes before 404 and 422.</li>
+  <li>Compare credentials as UTF-8 bytes with <code>secrets.compare_digest</code>, without short-circuiting; never log the <code>Authorization</code> header; refuse to start if authentication is enabled and a variable is empty (and, in production, unless authentication is enabled); disable <code>/docs</code> and <code>/openapi.json</code> in production; install no CORS middleware.</li>
+</ul>
+</div>
+<div>
+<h3>Folders</h3>
+<pre class="tree">backend/
+├─ pyproject.toml / uv.lock
+├─ db-automation-apply/ … the DDL (001_schema.sql)
+├─ alembic/ ………… migrations
+├─ openapi.json …… the contract shared with the frontend
+├─ scripts/export_openapi.py (needs no database)
+├─ src/app/
+│  ├─ main.py ………… create_app()
+│  ├─ core/ ………… config, security, exceptions
+│  ├─ db/ ………… base, session
+│  ├─ api/
+│  │  ├─ deps.py
+│  │  └─ v1/routes/ … articles (writer), public
+│  └─ domains/
+│     └─ articles/
+│        ├─ models.py
+│        ├─ schemas.py
+│        ├─ repository.py (thin)
+│        └─ service.py
+└─ tests/ ………… kept outside src
+   ├─ unit/ ……… rules that need no database
+   ├─ integration/ … real _test PostgreSQL: concurrency, crash injection, triggers
+   └─ api/ ………… auth matrix, status codes, route sweep</pre>
+<p class="cap">The specification lives in <code>specs/001-docs-studio/</code> at the repository root, not inside a project folder.</p>
+</div>
+</div>
+<h3>Error shape (uniform, and declared in OpenAPI)</h3>
+<pre><code>{ "error": { "code": "version_conflict", "message": "...", "details": { "current_draft_version": 7 } } }</code></pre>
+<p>Codes: <code>unauthorized</code>, <code>not_found</code>, <code>validation_error</code>, <code>version_conflict</code>, <code>empty_content</code>, <code>not_published</code>, <code>version_is_live</code>, <code>slug_conflict</code>. FastAPI's default 422 body is replaced by this envelope, and every route declares its error responses (<code>responses={404: ..., 409: ...}</code>) so the generated TypeScript client types the errors instead of treating them as <code>unknown</code>.</p>
+
+<!-- 5 -->
+<h2 id="frontend">5. Frontend structure (frontend)</h2>
+<div class="grid2">
+<div>
+<h3>What to use for what</h3>
+<div class="scroll"><table>
+<tr><th>Need</th><th>Mechanism</th></tr>
+<tr><td>Showing lists and details</td><td>Server Component (dynamic, never cached)</td></tr>
+<tr><td>Writes such as create, edit and publish</td><td>Server Action</td></tr>
+<tr><td>Asking an unauthenticated writer to sign in</td><td>proxy.ts checks that the header is present; a route handler returns the 401 challenge</td></tr>
+<tr><td>The editor form and preview</td><td>Client Component (the form only)</td></tr>
+</table></div>
+<p class="cap">Reads finish on the server, keeping the JavaScript sent to the browser to a minimum.</p>
+</div>
+<div>
+<h3>Folders</h3>
+<pre class="tree">frontend/
+├─ package.json / pnpm-lock.yaml
+├─ public/ ………… (keep a .gitkeep so the Docker COPY works)
+└─ src/
+   ├─ proxy.ts
+   ├─ app/
+   │  ├─ (public)/docs/[slug]/page.tsx
+   │  ├─ (public)/docs/page.tsx
+   │  ├─ (studio)/studio/
+   │  │  ├─ page.tsx ………… article list
+   │  │  ├─ [id]/page.tsx … edit + history
+   │  │  └─ actions.ts …… Server Actions
+   │  └─ auth/challenge/route.ts … returns 401 + WWW-Authenticate
+   ├─ features/articles/ … screen parts
+   ├─ components/ui/
+   └─ lib/
+      ├─ api/generated/ … auto-generated
+      ├─ api/server-client.ts
+      ├─ markdown.ts ……… shared renderer + sanitizer
+      └─ env.ts ………… validated lazily</pre>
+</div>
+</div>
+
+<h3>5.1 Basic authentication through Server Actions</h3>
+<ul>
+  <li>A Server Action runs on the server and has no <code>Authorization</code> header of its own. It reads the incoming header with <code>headers().get("authorization")</code> and passes it to the API on every call; the API client takes the header per call, never from a module-level singleton.</li>
+  <li>FastAPI is the only validator. <code>proxy.ts</code> only checks that the header is present on every <code>/studio/**</code> request (including action POSTs); it cannot validate.</li>
+  <li>When the API answers 401, the action surfaces it, and the page redirects to <code>/auth/challenge</code>, a route handler that returns <code>401</code> with <code>WWW-Authenticate: Basic realm="studio"</code>. A Server Action cannot set that response header itself.</li>
+  <li>Browsers cache Basic credentials per realm and path; there is no logout, which is accepted for this scope.</li>
+</ul>
+
+<h3>5.2 Public pages are never cached</h3>
+<ul>
+  <li>Public pages use <code>export const dynamic = "force-dynamic"</code> (and <code>cache: "no-store"</code> on the API fetch), so an unpublish takes effect on the next request and the build never fetches data. A caching layer is out of scope, and a stale page would break the 404 requirement.</li>
+  <li><code>API_BASE_URL</code> is a runtime-only server variable, never <code>NEXT_PUBLIC_*</code>. <code>env.ts</code> validates it lazily (inside the client factory), so <code>next build</code> does not need it.</li>
+</ul>
+
+<h3>5.3 Markdown rendering</h3>
+<ul>
+  <li>The stored body stays Markdown; the backend never renders it. The public Server Component renders it on the server (no raw HTML, <code>rehype-sanitize</code>, links limited to <code>http</code>, <code>https</code> and <code>mailto</code>), so no Markdown library is shipped to readers.</li>
+  <li>The writer's preview is a Client Component that imports the same <code>lib/markdown.ts</code>, so the preview and the published page cannot differ. Tests cover <code>javascript:</code> links and a raw <code>&lt;script&gt;</code>.</li>
+</ul>
+
+<h3>5.4 Editor and the conflict flow</h3>
+<ul>
+  <li>The page is a Server Component that fetches the draft and its <code>draft_version</code> and passes both to a small client form (<code>useActionState</code>). Save sends the <code>draft_version</code> the form was <b>loaded with</b>, never a re-fetched one.</li>
+  <li>On a 409 <code>version_conflict</code> the action returns the current server version without discarding the writer's text; the form shows both and lets the writer reload the latest or resubmit against the new version (FR-16).</li>
+  <li>After a successful Publish or Restore the action returns the new <code>draft_version</code> to the form.</li>
+</ul>
+
+<h3>5.5 Not found and metadata</h3>
+<ul>
+  <li>When the API returns 404, the Server Component calls <code>notFound()</code>, which gives a real 404 status. It never renders a "not found" message with a 200. A never-published and an unpublished article look identical.</li>
+  <li><code>generateMetadata</code> takes the title and description from the live snapshot; <code>/studio</code> is <code>noindex</code>.</li>
+</ul>
+
+<h3>5.6 Styling</h3>
+<ul>
+  <li>Tailwind CSS only, with no component library. A neutral palette with <b>one accent colour</b>, a system font stack, generous whitespace and a readable content width; light theme only.</li>
+  <li>A few shared components in <code>src/components/ui/</code> (button, input, textarea, tag, status badge, empty state), visible keyboard focus, and layouts that work from phone to desktop width.</li>
+  <li>It is a <b>time-boxed polish step after the functionality and its tests</b> (section 13, R16). Looks are not assessed, so it never delays the invariants.</li>
+</ul>
+
+<!-- 6 -->
+<h2 id="types">6. Keeping types in sync (generated from the API specification)</h2>
+<div class="note"><b>OpenAPI and OpenAI are different things.</b> OpenAPI is a standard format (formerly Swagger) for describing an API in a machine-readable way. It has nothing to do with AI. FastAPI generates this specification automatically from the code you write.</div>
+
+<h3>Why it is needed</h3>
+<p>If the shape of the data the backend API returns and the types the frontend expects drift apart, screens break and nobody notices until the app is run. So the backend definition is treated as the source of truth, and the frontend types are <b>generated</b> from it, which removes the drift.</p>
+
+<h3>Flow</h3>
+<div class="flow">
+  <div class="n be">1. backend: change the input/output types (Pydantic)</div><span class="a">→</span>
+  <div class="n be">2. FastAPI writes the API specification, <code>openapi.json</code></div><span class="a">→</span>
+  <div class="n fe">3. frontend: generate TypeScript types from it</div><span class="a">→</span>
+  <div class="n fe">4. Type errors show which screens need fixing</div>
+</div>
+
+<h3>Commands (when the API changes)</h3>
+<pre><code># backend: write the specification
+cd backend && uv run python scripts/export_openapi.py
+
+# frontend: generate types from that specification
+cd frontend && pnpm gen:api</code></pre>
+
+<ul>
+  <li>Do not edit the generated type files (<code>frontend/src/lib/api/generated/</code>) by hand.</li>
+  <li>Give every API an <code>operation_id</code> so the generated function names stay stable. Convention: set <code>operation_id</code> explicitly on every route, in camelCase for the TypeScript side (<code>listPublicArticles</code>, <code>publishArticle</code>); the names in <code>specs/001-docs-studio/contracts/openapi.yaml</code> are the reference.</li>
+  <li><code>scripts/export_openapi.py</code> only builds the app, so it needs no database. <code>make check-api</code> regenerates <code>openapi.json</code> and the types and fails on any difference; <code>make test</code> runs it, and <code>pnpm gen:api</code> is part of <code>make setup</code>.</li>
+</ul>
+
+<!-- 7 -->
+<h2 id="db">7. Database structure (PostgreSQL)</h2>
+<p class="cap">Production uses Cloud SQL for PostgreSQL; local runs use PostgreSQL 17 started by Docker Compose (the <code>db</code> and <code>db-test</code> services), or Cloud SQL through the Auth Proxy. The databases are <b>separate</b>: production, <code>&lt;name&gt;_dev</code> for development and <code>&lt;name&gt;_test</code> for tests. The DDL is stored in <code>backend/db-automation-apply/</code>.</p>
+<p>The key idea is to <b>never mix the draft and the published content in the same row</b>. The draft lives in the <code>draft_*</code> columns of <code>articles</code>; published content lives in the immutable <code>article_versions</code>.</p>
+
+<div class="fig">
+<h3 style="margin:0 0 6px">Data separation: drafts and published content never share a row</h3>
+<svg viewBox="0 0 960 300" role="img" aria-label="Data separation: drafts and published content never share a row">
+  <defs><marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect class="b-n" x="20" y="105" width="120" height="60" rx="10"/>
+  <text class="t" x="80" y="132" text-anchor="middle">Writer</text><text class="s m" x="80" y="150" text-anchor="middle">edits, Restore</text>
+  <rect class="b-n" x="190" y="30" width="270" height="230" rx="12"/>
+  <text class="t" x="325" y="52" text-anchor="middle">articles</text>
+  <rect class="b-fe" x="206" y="66" width="238" height="70" rx="8"/>
+  <text class="t" x="325" y="94" text-anchor="middle">draft_* (editable)</text><text class="s m" x="325" y="114" text-anchor="middle">title, body, tags, draft_version</text>
+  <rect class="b-db" x="206" y="150" width="238" height="96" rx="8"/>
+  <text class="t" x="325" y="176" text-anchor="middle">Publication state</text><text class="s" x="325" y="198" text-anchor="middle">status, published_at</text><text class="s" x="325" y="220" text-anchor="middle">current_published_version_id</text>
+  <rect class="b-n" x="570" y="30" width="200" height="230" rx="12"/>
+  <text class="t" x="670" y="52" text-anchor="middle">article_versions</text><text class="s m" x="670" y="68" text-anchor="middle">(immutable snapshots)</text>
+  <rect class="b-be" x="590" y="80" width="160" height="40" rx="8"/><text class="s" x="670" y="105" text-anchor="middle">v1</text>
+  <rect class="b-be" x="590" y="130" width="160" height="40" rx="8"/><text class="s" x="670" y="155" text-anchor="middle">v2</text>
+  <rect class="b-fe" x="590" y="180" width="160" height="60" rx="8" style="stroke-width:3"/><text class="t" x="670" y="215" text-anchor="middle">v3  LIVE</text>
+  <rect class="b-n" x="830" y="105" width="110" height="60" rx="10"/>
+  <text class="t" x="885" y="132" text-anchor="middle">Public reader</text>
+  <path class="ln" marker-end="url(#arA)" d="M140 135 H206"/>
+  <path class="ln" marker-end="url(#arA)" d="M444 100 H520 V200 H590"/>
+  <text class="s m" x="500" y="88" text-anchor="middle">Publish copies</text><text class="s m" x="500" y="74" text-anchor="middle" style="display:none"></text>
+  <text class="s m" x="478" y="250" text-anchor="start" style="display:none"></text>
+  <path class="ln d" marker-end="url(#arA)" d="M444 226 H590"/>
+  <text class="s m" x="515" y="244" text-anchor="middle">pointer</text>
+  <path class="ln" marker-end="url(#arA)" d="M830 135 H800 V210 H750"/>
+  <text class="s m" x="885" y="190" text-anchor="middle">reads only the live</text><text class="s m" x="885" y="206" text-anchor="middle">snapshot (one JOIN)</text>
+  <text class="s" x="480" y="288" text-anchor="middle">The public side never reads <tspan font-weight="700">draft_*</tspan>. Editing the draft cannot change what readers see.</text>
+</svg>
+<div class="cap">Drafts live in <code>articles.draft_*</code>; a Publish copies them into a new immutable row of <code>article_versions</code> and moves the pointer. Readers only follow the pointer.</div>
+</div>
+
+<div class="fig">
+<svg viewBox="0 0 960 500" role="img" aria-label="ER diagram">
+  <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+
+  <!-- articles -->
+  <rect class="b-db" x="20" y="20" width="400" height="30" rx="8"/>
+  <text class="t" x="220" y="41" text-anchor="middle">articles (article = draft + publication state)</text>
+  <rect class="b-n" x="20" y="50" width="400" height="390"/>
+  <g class="s">
+    <text x="32" y="72"><tspan font-weight="700">PK</tspan>  id  BIGINT</text>
+    <text x="32" y="102">UQ  slug  TEXT</text>
+    <text x="32" y="132">     status  TEXT  <tspan class="m">draft / published / unpublished</tspan></text>
+    <text x="32" y="162">     draft_title  TEXT</text>
+    <text x="32" y="192">     draft_body  TEXT</text>
+    <text x="32" y="222">     draft_tags  TEXT[]</text>
+    <text x="32" y="252">     draft_version  INT  <tspan class="m">← optimistic concurrency</tspan></text>
+    <text x="32" y="282">     last_version_number  INT  <tspan class="m">← numbering counter, never reused</tspan></text>
+    <text x="32" y="312"><tspan font-weight="700">FK</tspan>  current_published_version_id  BIGINT NULL</text>
+    <text x="32" y="342">     published_at  TIMESTAMPTZ NULL  <tspan class="m">← first publication time</tspan></text>
+    <text x="32" y="372">     created_at  TIMESTAMPTZ</text>
+    <text x="32" y="402">     updated_at  TIMESTAMPTZ</text>
+  </g>
+  <rect x="20" y="296" width="400" height="56" fill="none" stroke="var(--db)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+  <!-- article_versions -->
+  <rect class="b-be" x="560" y="20" width="380" height="30" rx="8"/>
+  <text class="t" x="750" y="41" text-anchor="middle">article_versions (published snapshots, immutable)</text>
+  <rect class="b-n" x="560" y="50" width="380" height="270"/>
+  <g class="s">
+    <text x="572" y="72"><tspan font-weight="700">PK</tspan>  id  BIGINT</text>
+    <text x="572" y="102"><tspan font-weight="700">FK</tspan>  article_id  BIGINT  → articles.id</text>
+    <text x="572" y="132">UQ  version_number  INT  <tspan class="m">(unique together with article_id)</tspan></text>
+    <text x="572" y="162">     title  TEXT</text>
+    <text x="572" y="192">     body  TEXT</text>
+    <text x="572" y="222">     tags  TEXT[]</text>
+    <text x="572" y="252">     created_at  TIMESTAMPTZ</text>
+    <text x="572" y="290" class="m">UPDATE is forbidden (rejected by a trigger)</text>
+  </g>
+
+  <!-- relations -->
+  <path class="ln" marker-end="url(#ar3)" d="M560 97 H490 V97 H420"/>
+  <path class="ln" d="M560 97 H420" />
+  <text class="s" x="490" y="86" text-anchor="middle">1 : N</text>
+  <text class="s m" x="490" y="116" text-anchor="middle">all versions</text>
+
+  <path class="ln d" marker-end="url(#ar3)" d="M420 309 H500 V225 H560"/>
+  <text class="s" x="500" y="330" text-anchor="middle">N : 0..1</text>
+  <text class="s m" x="500" y="348" text-anchor="middle">the live version</text>
+
+  <rect class="b-w" x="20" y="455" width="920" height="36" rx="8"/>
+  <text class="s" x="34" y="478">Solid line = every version (article_id). Dashed line = the live version (current_published_version_id), kept after unpublishing.</text>
+</svg>
+<div class="cap">The dashed box marks the columns that hold the publication state. <code>draft_*</code> changes on every edit, while <code>article_versions</code> only gains a row each time an article is published.</div>
+</div>
+
+<h3>DDL (source: <code>backend/db-automation-apply/001_schema.sql</code>)</h3>
+<pre><code>-- 001_schema.sql
+-- Schema for Docs Studio (PostgreSQL). Apply the files in this folder in numeric order.
+-- Source of truth for the data model; docs/nextjs-fastapi-architecture.html (section 7) mirrors it.
+
+-- ---------------------------------------------------------------------------
+-- articles: the draft and the publication state of one article
+-- ---------------------------------------------------------------------------
+CREATE TABLE articles (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  slug          TEXT        NOT NULL UNIQUE
+                CHECK (char_length(slug) BETWEEN 1 AND 100
+                       AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  status        TEXT        NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published', 'unpublished')),
+
+  -- Draft content (editable). Never shown to the public side.
+  draft_title   TEXT        NOT NULL
+                CHECK (char_length(btrim(draft_title)) BETWEEN 1 AND 200),
+  draft_body    TEXT        NOT NULL DEFAULT ''
+                CHECK (char_length(draft_body) &lt;= 100000),
+  draft_tags    TEXT[]      NOT NULL DEFAULT '{}'
+                CHECK (cardinality(draft_tags) &lt;= 10),
+
+  -- Optimistic concurrency: bumped by an edit, a Restore, and a Publish that creates a snapshot.
+  draft_version INTEGER     NOT NULL DEFAULT 1 CHECK (draft_version &gt;= 1),
+
+  -- Per-article counter used to number snapshots. It never goes down, so numbers are never reused.
+  last_version_number INTEGER NOT NULL DEFAULT 0 CHECK (last_version_number &gt;= 0),
+
+  -- Publication state
+  current_published_version_id BIGINT,           -- the protected (live) version; kept after Unpublish
+  published_at  TIMESTAMPTZ,                      -- first publication time; never changes once set
+
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+
+  -- A never-published article has no pointer and no published_at; every other state has both.
+  CONSTRAINT articles_publish_consistency CHECK (
+    (status = 'draft'
+       AND current_published_version_id IS NULL AND published_at IS NULL)
+    OR
+    (status IN ('published', 'unpublished')
+       AND current_published_version_id IS NOT NULL AND published_at IS NOT NULL)
+  )
+);
+
+-- ---------------------------------------------------------------------------
+-- article_versions: immutable published snapshots
+-- ---------------------------------------------------------------------------
+CREATE TABLE article_versions (
+  id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  article_id     BIGINT      NOT NULL REFERENCES articles (id) ON DELETE RESTRICT,
+  version_number INTEGER     NOT NULL CHECK (version_number &gt; 0),
+  title          TEXT        NOT NULL,
+  body           TEXT        NOT NULL,
+  tags           TEXT[]      NOT NULL DEFAULT '{}' CHECK (cardinality(tags) &lt;= 10),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (article_id, version_number),
+  UNIQUE (article_id, id)              -- target of the composite foreign key below
+);
+
+-- An article can only point at one of its own versions, and a referenced version cannot be deleted.
+-- With a NULL pointer (never published) the foreign key is not checked (MATCH SIMPLE).
+ALTER TABLE articles
+  ADD CONSTRAINT articles_current_version_fk
+  FOREIGN KEY (id, current_published_version_id)
+  REFERENCES article_versions (article_id, id) ON DELETE RESTRICT;
+
+-- ---------------------------------------------------------------------------
+-- Guards
+-- ---------------------------------------------------------------------------
+
+-- Snapshots are immutable: reject every UPDATE (DELETE stays allowed; the foreign key protects the live one).
+CREATE FUNCTION forbid_version_update() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  RAISE EXCEPTION 'article_versions is immutable';
+END $$;
+
+CREATE TRIGGER article_versions_immutable
+  BEFORE UPDATE ON article_versions
+  FOR EACH ROW EXECUTE FUNCTION forbid_version_update();
+
+-- TRUNCATE bypasses row triggers, so guard it separately.
+-- The only exception is the test suite, which resets the data between tests inside a transaction
+-- that first runs: SET LOCAL docs.allow_reset = 'on'. The application never sets it, and the
+-- application role has no TRUNCATE privilege.
+CREATE FUNCTION forbid_version_truncate() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  IF current_setting('docs.allow_reset', true) = 'on' THEN
+    RETURN NULL;
+  END IF;
+  RAISE EXCEPTION 'article_versions cannot be truncated';
+END $$;
+
+CREATE TRIGGER article_versions_no_truncate
+  BEFORE TRUNCATE ON article_versions
+  FOR EACH STATEMENT EXECUTE FUNCTION forbid_version_truncate();
+
+-- Once published, an article never goes back to "never published", keeps its published_at,
+-- and its pointer only moves forward. The slug never changes. updated_at is maintained here.
+CREATE FUNCTION articles_guard() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF NEW.slug IS DISTINCT FROM OLD.slug THEN
+    RAISE EXCEPTION 'slug cannot be changed';
+  END IF;
+
+  IF OLD.current_published_version_id IS NOT NULL THEN
+    IF NEW.current_published_version_id IS NULL OR NEW.status = 'draft' THEN
+      RAISE EXCEPTION 'a published article cannot return to draft';
+    END IF;
+    IF NEW.published_at IS DISTINCT FROM OLD.published_at THEN
+      RAISE EXCEPTION 'published_at cannot change once set';
+    END IF;
+    IF NEW.current_published_version_id IS DISTINCT FROM OLD.current_published_version_id
+       AND (SELECT version_number FROM article_versions WHERE id = NEW.current_published_version_id)
+        &lt;= (SELECT version_number FROM article_versions WHERE id = OLD.current_published_version_id) THEN
+      RAISE EXCEPTION 'the live version can only move forward';
+    END IF;
+  END IF;
+
+  NEW.updated_at := clock_timestamp();
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER articles_guard_trg
+  BEFORE UPDATE ON articles
+  FOR EACH ROW EXECUTE FUNCTION articles_guard();
+
+-- ---------------------------------------------------------------------------
+-- Indexes
+-- (article_versions needs no extra index: UNIQUE (article_id, version_number) already serves it)
+-- ---------------------------------------------------------------------------
+CREATE INDEX articles_public_idx
+  ON articles (published_at DESC, id DESC) WHERE status = 'published';
+CREATE INDEX articles_writer_list_idx
+  ON articles (updated_at DESC, id DESC);
+
+-- ---------------------------------------------------------------------------
+-- Privileges (adjust the role names to your environment; run as the owner / migration role)
+-- ---------------------------------------------------------------------------
+-- REVOKE UPDATE, TRUNCATE ON article_versions FROM app_role;
+-- GRANT SELECT, INSERT, DELETE ON article_versions TO app_role;
+-- GRANT SELECT, INSERT, UPDATE ON articles TO app_role;
+</code></pre>
+
+<h3>Invariants and what protects them</h3>
+<p class="cap">Atomicity comes from the <b>transaction</b>; the constraints below stop bad states from being stored even if a bug or a manual change tries.</p>
+<div class="scroll"><table>
+<tr><th>Invariant</th><th>Application (Service)</th><th>Database (last line of defence)</th></tr>
+<tr><td>A published snapshot never changes</td><td>No update API or method exists</td><td>UPDATE trigger and TRUNCATE trigger on <code>article_versions</code>; <code>REVOKE UPDATE, TRUNCATE</code> from the application role</td></tr>
+<tr><td>Publish is atomic</td><td>One transaction, a row lock (<code>FOR UPDATE</code>) and statement-time timestamps</td><td><code>articles_publish_consistency</code> CHECK and the composite FK: no dangling pointer, no mismatched status</td></tr>
+<tr><td>No return to "never published"; the pointer only moves forward</td><td>Publish creates a higher number and points at it</td><td><code>articles_guard</code> trigger: the pointer and <code>published_at</code> cannot be cleared, the pointer cannot move back, the slug cannot change</td></tr>
+<tr><td>The protected version cannot be deleted</td><td>Delete takes the row lock, checks the pointer and returns 409 <code>version_is_live</code></td><td><code>ON DELETE RESTRICT</code> on the composite FK (SQLSTATE 23503 is mapped to the same 409)</td></tr>
+<tr><td>Restore does not damage history</td><td>One UPDATE of <code>draft_*</code> and <code>draft_version</code>; never touches versions or the publication state</td><td>(Tests confirm every row of <code>article_versions</code> is unchanged)</td></tr>
+<tr><td>Concurrent edits are detected</td><td><code>WHERE draft_version = :expected</code> for edit and Restore; the same comparison under the lock for Publish</td><td>—</td></tr>
+<tr><td>History survives unpublishing</td><td>Unpublish only updates <code>status</code></td><td>The CHECK and <code>articles_guard</code> keep the pointer and <code>published_at</code></td></tr>
+<tr><td>version_number is never duplicated or reused</td><td><code>last_version_number</code> is incremented under the row lock</td><td><code>UNIQUE (article_id, version_number)</code>; the counter column never decreases</td></tr>
+</table></div>
+<div class="ok">Guarding in the application and again in the database means bugs or manual operations cannot leave inconsistent data behind. Alembic autogenerate does not create the circular FK, the triggers or the CHECKs correctly, so the DDL is written by hand in <code>db-automation-apply/</code>.</div>
+
+<!-- 8 -->
+<h2 id="state">8. Article state transitions</h2>
+<div class="fig">
+<h3 style="margin:0 0 6px">Life of one article: what changes at each step</h3>
+<svg viewBox="0 0 960 330" role="img" aria-label="Life of one article: what changes at each step">
+  <line x1="120" y1="52" x2="120" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="120" y="42" text-anchor="middle">Create</text><line x1="215" y1="52" x2="215" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="215" y="42" text-anchor="middle">Edit</text><line x1="310" y1="52" x2="310" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="310" y="42" text-anchor="middle">Publish</text><line x1="405" y1="52" x2="405" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="405" y="42" text-anchor="middle">Edit</text><line x1="500" y1="52" x2="500" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="500" y="42" text-anchor="middle">Publish</text><line x1="595" y1="52" x2="595" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="595" y="42" text-anchor="middle">Unpublish</text><line x1="690" y1="52" x2="690" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="690" y="42" text-anchor="middle">Edit</text><line x1="785" y1="52" x2="785" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="785" y="42" text-anchor="middle">Restore v1</text><line x1="880" y1="52" x2="880" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="880" y="42" text-anchor="middle">Publish</text>
+  <text class="s m" x="10" y="92">Status</text>
+  <rect class="b-n" x="120" y="72" width="190" height="34"/><text class="s" x="215" y="94" text-anchor="middle">never published</text>
+  <rect class="b-fe" x="310" y="72" width="285" height="34"/><text class="s" x="452" y="94" text-anchor="middle">published</text>
+  <rect class="b-w" x="595" y="72" width="285" height="34"/><text class="s" x="737" y="94" text-anchor="middle">unpublished</text>
+  <rect class="b-fe" x="880" y="72" width="70" height="34"/><text class="s" x="915" y="94" text-anchor="middle">published</text>
+  <text class="s m" x="10" y="140">Live pointer</text>
+  <rect class="b-n" x="120" y="120" width="190" height="34"/><text class="s m" x="215" y="142" text-anchor="middle">none</text>
+  <rect class="b-db" x="310" y="120" width="190" height="34"/><text class="s" x="405" y="142" text-anchor="middle">v1</text>
+  <rect class="b-db" x="500" y="120" width="380" height="34"/><text class="s" x="690" y="142" text-anchor="middle">v2 (kept after Unpublish)</text>
+  <rect class="b-db" x="880" y="120" width="70" height="34"/><text class="s" x="915" y="142" text-anchor="middle">v3</text>
+  <text class="s m" x="10" y="188">draft_version</text>
+  <text class="t" x="120" y="184" text-anchor="middle">1</text><text class="t" x="215" y="184" text-anchor="middle">2</text><text class="t" x="310" y="184" text-anchor="middle">3</text><text class="t" x="405" y="184" text-anchor="middle">4</text><text class="t" x="500" y="184" text-anchor="middle">5</text><text class="t" x="595" y="184" text-anchor="middle">5</text><text class="t" x="690" y="184" text-anchor="middle">6</text><text class="t" x="785" y="184" text-anchor="middle">7</text><text class="t" x="880" y="184" text-anchor="middle">8</text>
+  <text class="s m" x="10" y="236">Snapshots</text>
+  <rect class="b-be" x="288" y="218" width="44" height="26" rx="6"/><text class="s" x="310" y="236" text-anchor="middle">v1</text>
+  <rect class="b-be" x="478" y="218" width="44" height="26" rx="6"/><text class="s" x="500" y="236" text-anchor="middle">v2</text>
+  <rect class="b-be" x="858" y="218" width="44" height="26" rx="6"/><text class="s" x="880" y="236" text-anchor="middle">v3</text>
+  <text class="s" x="480" y="282" text-anchor="middle">A snapshot is added only by a Publish that changes the content, and is never changed afterwards.</text>
+  <text class="s" x="480" y="304" text-anchor="middle">Unpublish keeps the pointer and published_at; Restore changes only the draft.</text>
+</svg>
+<div class="cap">Read left to right. Status and pointer change only at Publish and Unpublish; Edit and Restore change only the draft (and <code>draft_version</code>).</div>
+</div>
+
+<div class="fig">
+<svg viewBox="0 0 960 330" role="img" aria-label="State transition diagram">
+  <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect class="b-n" x="30" y="110" width="170" height="70" rx="35"/>
+  <text class="t" x="115" y="141" text-anchor="middle">draft</text><text class="s m" x="115" y="161" text-anchor="middle">never published</text>
+  <rect class="b-be" x="395" y="110" width="170" height="70" rx="35"/>
+  <text class="t" x="480" y="141" text-anchor="middle">published</text><text class="s m" x="480" y="161" text-anchor="middle">live</text>
+  <rect class="b-w" x="760" y="110" width="170" height="70" rx="35"/>
+  <text class="t" x="845" y="141" text-anchor="middle">unpublished</text><text class="s m" x="845" y="161" text-anchor="middle">taken down (history kept)</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M200 135 H395"/>
+  <text class="s" x="297" y="122" text-anchor="middle">Publish (first time)</text><text class="s m" x="297" y="156" text-anchor="middle">creates v1 + sets published_at</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M565 135 H760"/>
+  <text class="s" x="662" y="122" text-anchor="middle">Unpublish</text><text class="s m" x="662" y="156" text-anchor="middle">changes status only</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M845 180 V250 H530 Q480 250 480 185"/>
+  <text class="s" x="690" y="270" text-anchor="middle">Publish (republish)</text><text class="s m" x="690" y="288" text-anchor="middle">new version (published_at kept), or only a status flip if the draft equals the live snapshot</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M440 110 C430 40 530 40 520 110"/>
+  <text class="s" x="480" y="40" text-anchor="middle">Publish (republish): creates a new version and moves the pointer</text>
+
+  <path class="ln d" d="M115 110 C100 60 130 60 115 110"/>
+  <text class="s m" x="115" y="70" text-anchor="middle">Editing and Restore</text><text class="s m" x="115" y="86" text-anchor="middle">do not change the state</text>
+</svg>
+<div class="cap">Editing and Restore only change the <code>draft_*</code> columns; in every state, status and the live version stay put. The public side only ever sees the "live snapshot" of a <code>published</code> article.</div>
+</div>
+
+<h3>Operation matrix: what every operation does in every state</h3>
+<div class="scroll"><table>
+<tr><th>Operation</th><th>From status</th><th>To status</th><th>Live pointer</th><th>published_at</th><th>draft_version</th><th>Snapshots</th><th>Result</th></tr>
+<tr><td>Create</td><td>—</td><td>draft</td><td>none</td><td>none</td><td>1</td><td>none</td><td>201</td></tr><tr><td>Edit the draft</td><td>any</td><td>unchanged</td><td>unchanged</td><td>unchanged</td><td>+1</td><td>unchanged</td><td>200 (409 if stale)</td></tr><tr><td>Publish, first time</td><td>draft</td><td>published</td><td>→ new v1</td><td>set once</td><td>+1</td><td>+1 new</td><td>201</td></tr><tr><td>Publish, changed draft</td><td>published / unpublished</td><td>published</td><td>→ new version</td><td>kept</td><td>+1</td><td>+1 new</td><td>201</td></tr><tr><td>Publish, draft equals live</td><td>published</td><td>published</td><td>unchanged</td><td>kept</td><td>unchanged</td><td>none</td><td>200</td></tr><tr><td>Publish, draft equals live</td><td>unpublished</td><td>published</td><td>unchanged</td><td>kept</td><td>unchanged</td><td>none</td><td>200</td></tr><tr><td>Unpublish</td><td>published</td><td>unpublished</td><td>kept</td><td>kept</td><td>unchanged</td><td>none</td><td>200</td></tr><tr><td>Unpublish</td><td>draft / unpublished</td><td>—</td><td>—</td><td>—</td><td>—</td><td>none</td><td>409 not_published</td></tr><tr><td>Restore vN</td><td>any</td><td>unchanged</td><td>unchanged</td><td>unchanged</td><td>+1</td><td>none (all rows identical)</td><td>200 (404 / 409)</td></tr><tr><td>Delete a version</td><td>any</td><td>unchanged</td><td>unchanged</td><td>unchanged</td><td>unchanged</td><td>−1 (not the pointer's)</td><td>204</td></tr><tr><td>Delete the protected version</td><td>published / unpublished</td><td>—</td><td>—</td><td>—</td><td>—</td><td>none</td><td>409 version_is_live</td></tr>
+</table></div>
+<p class="cap">Reading across a row gives the complete effect of an operation. The pointer and <code>published_at</code> only ever change in Publish; Restore and Edit touch only the draft; Unpublish and Delete never remove the live snapshot.</p>
+
+<!-- 9 -->
+<h2 id="publish">9. Publish and concurrency control: the essentials</h2>
+<p>Every writer operation takes the <b>article row lock first</b> (or is a single conditional UPDATE), and all decisions are made against the locked row. The lock order is always article row, then version rows, so operations cannot deadlock each other. <code>READ COMMITTED</code> is enough; do not use <code>REPEATABLE READ</code>, which would turn these waits into serialization errors.</p>
+<div class="fig">
+<h3 style="margin:0 0 6px">Publish: the order of decisions</h3>
+<svg viewBox="0 0 960 510" role="img" aria-label="Publish: the order of decisions">
+  <defs><marker id="arC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect class="b-fe" x="110" y="14" width="380" height="34" rx="8"/><text class="s" x="300.0" y="35.0" text-anchor="middle">POST /articles/{id}/publish  { expected_draft_version }</text><rect class="b-n" x="110" y="66" width="380" height="30" rx="8"/><text class="s" x="300.0" y="85.0" text-anchor="middle">BEGIN; lock the article row (FOR UPDATE)</text><path class="b-n" d="M300.0 118 L450 146.0 L300.0 174 L150 146.0 Z"/><text class="s" x="300.0" y="150.0" text-anchor="middle">Article exists?</text><path class="b-n" d="M300.0 198 L450 226.0 L300.0 254 L150 226.0 Z"/><text class="s" x="300.0" y="230.0" text-anchor="middle">expected_draft_version = draft_version?</text><path class="b-n" d="M300.0 278 L450 306.0 L300.0 334 L150 306.0 Z"/><text class="s" x="300.0" y="310.0" text-anchor="middle">Title and body non-empty?</text><path class="b-n" d="M300.0 358 L450 386.0 L300.0 414 L150 386.0 Z"/><text class="s" x="300.0" y="390.0" text-anchor="middle">Draft = live snapshot?</text><rect class="b-fe" x="110" y="448" width="380" height="46" rx="8"/><text class="s" x="300.0" y="467.0" text-anchor="middle">Counter + 1 → INSERT snapshot → UPDATE status,</text><text class="s" x="300.0" y="483.0" text-anchor="middle">pointer, published_at, draft_version + 1 → COMMIT → 201</text><path class="ln" marker-end="url(#arC)" d="M300 48 V66"/><path class="ln" marker-end="url(#arC)" d="M300 96 V118"/><path class="ln" marker-end="url(#arC)" d="M300 174 V198"/><path class="ln" marker-end="url(#arC)" d="M300 254 V278"/><path class="ln" marker-end="url(#arC)" d="M300 334 V358"/><path class="ln" marker-end="url(#arC)" d="M300 414 V448"/><path class="ln" marker-end="url(#arC)" d="M450 146 H600"/><text class="s m" x="475" y="140">no</text><rect class="b-w" x="600" y="128" width="330" height="36" rx="8"/><text class="s" x="765.0" y="150.0" text-anchor="middle">404 not found</text><path class="ln" marker-end="url(#arC)" d="M450 226 H600"/><text class="s m" x="475" y="220">no</text><rect class="b-w" x="600" y="208" width="330" height="36" rx="8"/><text class="s" x="765.0" y="230.0" text-anchor="middle">409 version_conflict — nothing changes</text><path class="ln" marker-end="url(#arC)" d="M450 306 H600"/><text class="s m" x="475" y="300">no</text><rect class="b-w" x="600" y="288" width="330" height="36" rx="8"/><text class="s" x="765.0" y="310.0" text-anchor="middle">422 empty_content</text><path class="ln" marker-end="url(#arC)" d="M450 386 H600"/><text class="s m" x="475" y="380">yes</text><rect class="b-be" x="600" y="360" width="330" height="52" rx="8"/><text class="s" x="765.0" y="382.0" text-anchor="middle">200: no new snapshot</text><text class="s" x="765.0" y="398.0" text-anchor="middle">(status back to published if it was unpublished)</text><text class="s m" x="308" y="190">yes</text><text class="s m" x="308" y="270">yes</text><text class="s m" x="308" y="350">yes</text><text class="s m" x="308" y="430">no</text>
+</svg>
+<div class="cap">Every decision is made after the lock, against the locked row. Anything that fails before the final step leaves the database unchanged.</div>
+</div>
+
+<div class="grid2">
+<div class="card">
+<h3 style="margin-top:0">Publish (one transaction)</h3>
+<pre><code>BEGIN;
+SET LOCAL lock_timeout = '3s';
+SELECT a.*, v.title AS live_title,
+       v.body AS live_body, v.tags AS live_tags
+FROM articles a
+LEFT JOIN article_versions v
+  ON v.article_id = a.id
+ AND v.id = a.current_published_version_id
+WHERE a.id = :id
+FOR UPDATE OF a;                    -- 0 rows: 404
+
+-- decide AFTER the lock, never from an earlier read
+--  a.draft_version &lt;&gt; :expected  -> 409 version_conflict
+--  title or body empty           -> 422 empty_content
+--  draft IS NOT DISTINCT FROM live (title, body, tags)
+--    -> unpublished: set status = 'published'
+--       otherwise: no write            => 200
+
+UPDATE articles
+   SET last_version_number = last_version_number + 1
+ WHERE id = :id
+RETURNING last_version_number;      -- :n
+
+INSERT INTO article_versions
+  (article_id, version_number, title, body, tags)
+SELECT id, :n, draft_title, draft_body, draft_tags
+  FROM articles WHERE id = :id
+RETURNING id;                       -- :vid
+
+UPDATE articles SET
+  status = 'published',
+  current_published_version_id = :vid,
+  published_at = COALESCE(published_at, clock_timestamp()),
+  draft_version = draft_version + 1
+WHERE id = :id;
+COMMIT;                             -- 201</code></pre>
+<p class="cap">A row-wise comparison under the lock is exact; no hash column is needed. The comparison is with the <b>live</b> snapshot only, so a draft equal to an older version still creates a new version. <code>updated_at</code> is set by the <code>articles_guard</code> trigger.</p>
+</div>
+<div class="card">
+<h3 style="margin-top:0">Optimistic concurrency (editing the draft)</h3>
+<pre><code>UPDATE articles SET
+  draft_title = :t, draft_body = :b, draft_tags = :g,
+  draft_version = draft_version + 1
+WHERE id = :id
+  AND draft_version = :expected     -- the version that was read
+RETURNING draft_version;
+-- 0 rows: SELECT draft_version FROM articles WHERE id = :id
+--   no row -> 404
+--   else   -> 409 version_conflict
+--             details.current_draft_version = that value</code></pre>
+<div class="flow">
+  <div class="n">A: reads v5</div><div class="n">B: reads v5</div><div class="n be">A: saves → v6</div><div class="n" style="border-color:var(--warn);background:var(--warn-bg)">B: saves (v5) → 409</div>
+</div>
+<p class="cap">The 409 carries the current <code>draft_version</code>, and the screen lets the writer reload or resubmit (FR-16). Under <code>READ COMMITTED</code>, B's UPDATE waits for A, re-checks its WHERE clause against the new row and updates nothing.</p>
+
+<h3>Restore (one statement)</h3>
+<pre><code>UPDATE articles SET
+  draft_title = v.title, draft_body = v.body,
+  draft_tags = v.tags,
+  draft_version = draft_version + 1
+FROM article_versions v
+WHERE articles.id = :id
+  AND v.article_id = :id AND v.version_number = :n
+  AND articles.draft_version = :expected
+RETURNING articles.draft_version;
+-- 0 rows: 404 if the article or version is missing, else 409</code></pre>
+<p class="cap">It touches no version row and none of <code>status</code>, the pointer or <code>published_at</code>, whatever the article's state.</p>
+</div>
+</div>
+<div class="grid2">
+<div class="card">
+<h3 style="margin-top:0">Unpublish</h3>
+<pre><code>SELECT status FROM articles
+ WHERE id = :id FOR UPDATE;         -- 404 if missing
+-- status &lt;&gt; 'published'  -> 409 not_published
+UPDATE articles SET status = 'unpublished'
+ WHERE id = :id;                    -- pointer, published_at kept</code></pre>
+</div>
+<div class="card">
+<h3 style="margin-top:0">Delete a version</h3>
+<pre><code>SELECT current_published_version_id
+  FROM articles WHERE id = :id FOR UPDATE;
+-- version number missing        -> 404
+-- it is the pointer's version   -> 409 version_is_live
+DELETE FROM article_versions
+ WHERE article_id = :id
+   AND version_number = :n;         -- 204
+-- SQLSTATE 23503 (FK) -> the same 409</code></pre>
+</div>
+</div>
+<div class="fig">
+<h3 style="margin:0 0 6px">Two Publish requests at the same time (same expected_draft_version)</h3>
+<svg viewBox="0 0 960 300" role="img" aria-label="Two Publish requests at the same time (same expected_draft_version)">
+  <text class="s m" x="10" y="72">Request A</text>
+  <rect class="b-fe" x="130" y="52" width="150" height="34" rx="6"/><text class="s" x="205" y="74" text-anchor="middle">BEGIN + lock</text>
+  <rect class="b-fe" x="280" y="52" width="230" height="34" rx="6"/><text class="s" x="395" y="74" text-anchor="middle">checks, INSERT snapshot, UPDATE</text>
+  <rect class="b-fe" x="510" y="52" width="80" height="34" rx="6"/><text class="s" x="550" y="74" text-anchor="middle">COMMIT</text>
+  <text class="t" x="640" y="74" fill="var(--fe)">201 new version</text>
+  <text class="s m" x="10" y="142">Request B</text>
+  <rect class="b-n" x="190" y="122" width="70" height="34" rx="6"/><text class="s" x="225" y="144" text-anchor="middle">BEGIN</text>
+  <rect class="b-w" x="260" y="122" width="330" height="34" rx="6" style="stroke-dasharray:5 3"/><text class="s" x="425" y="144" text-anchor="middle">waits for the row lock</text>
+  <rect class="b-be" x="590" y="122" width="60" height="34" rx="6"/><text class="s" x="620" y="144" text-anchor="middle">lock</text>
+  <rect class="b-w" x="650" y="122" width="110" height="34" rx="6"/><text class="s" x="705" y="144" text-anchor="middle">stale → 409</text>
+  <text class="t" x="780" y="144" fill="var(--warn)">409 version_conflict</text>
+  <text class="s m" x="10" y="212">Article row</text>
+  <rect class="b-db" x="130" y="192" width="460" height="34" rx="6"/><text class="s" x="360" y="214" text-anchor="middle">locked by A</text>
+  <rect class="b-db" x="590" y="192" width="170" height="34" rx="6"/><text class="s" x="675" y="214" text-anchor="middle">locked by B</text>
+  <line x1="590" y1="46" x2="590" y2="232" stroke="var(--muted)" stroke-dasharray="3 4"/>
+  <text class="s" x="480" y="272" text-anchor="middle">Exactly one request wins. The other waits, sees the new draft_version and is rejected. No 5xx, and version numbers stay contiguous.</text>
+</svg>
+</div>
+
+<h3>Implementation notes (async SQLAlchemy)</h3>
+<ul>
+  <li>One session and one <code>async with session.begin()</code> per request, owned by the Service; <code>expire_on_commit=False</code>.</li>
+  <li>Locking reads use <code>with_for_update(of=Article).execution_options(populate_existing=True)</code>, otherwise a stale object in the identity map defeats the lock. Prefer Core <code>UPDATE … RETURNING</code> on the concurrency paths.</li>
+  <li><code>SET LOCAL lock_timeout</code> and <code>statement_timeout</code>; map a lock timeout to 503. On SQLSTATE 23505 for the slug, retry the numbering (U15); map 23503 to 409 <code>version_is_live</code>; never return a 500.</li>
+  <li>Pool: <code>pool_size=3</code>, <code>max_overflow=2</code>, <code>pool_pre_ping=True</code>, <code>pool_recycle=1800</code>, so three Cloud Run instances stay within a small Cloud SQL instance's <code>max_connections</code>. Connect lazily so a database blip at start-up does not kill the container.</li>
+  <li>Timestamps use <code>clock_timestamp()</code> (statement time), so a request that waited for the lock does not get an earlier time than the previous version. The session time zone is UTC.</li>
+</ul>
+
+<!-- 10 -->
+<h2 id="api">10. API list (draft)</h2>
+<p>All paths are under <code>/api/v1</code>. <b>Writer endpoints require Basic authentication</b> (when it is enabled: always in production) and check it first, so a missing or wrong credential is a 401 before any 404 or 422. Public endpoints (<code>/public/*</code>) and <code>/healthz</code> need no authentication. The confirmed version follows <code>specs/001-docs-studio/plan.md</code>.</p>
+<div class="scroll"><table>
+<tr><th>Area</th><th>Method / path</th><th>Purpose</th><th>Success</th><th>Main errors</th></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles</code></td><td>Create an article (<code>draft_version</code> starts at 1, status <code>draft</code>, no snapshot). A taken slug gets a numeric suffix (U15) and the stored slug is returned</td><td>201 + <code>Location</code></td><td>409 <code>slug_conflict</code> (only when every retry loses a race), 422</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>GET /articles?status=&amp;limit=&amp;offset=</code></td><td>List all articles, newest <code>updated_at</code> first (at most 100)</td><td>200</td><td>422 unknown status</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}</code></td><td>Detail, including the draft</td><td>200</td><td>404</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>PATCH /articles/{id}</code></td><td>Partial update of the draft: omitted fields keep their value, <code>tags</code> replaces the whole list, <code>expected_draft_version</code> required, no slug</td><td>200</td><td>404, 409 <code>version_conflict</code>, 422</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/publish</code></td><td>Publish (body: <code>expected_draft_version</code>)</td><td>201 new snapshot / 200 unchanged draft</td><td>404, 409 <code>version_conflict</code>, 422 <code>empty_content</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/unpublish</code></td><td>Take the article down (no version check)</td><td>200</td><td>404, 409 <code>not_published</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}/versions</code></td><td>History, newest first: id, <code>version_number</code>, title, <code>created_at</code>, <code>is_live</code> (no body)</td><td>200</td><td>404</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}/versions/{n}</code></td><td>Full content of one version</td><td>200</td><td>404</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/versions/{n}/restore</code></td><td>Copy the version into the draft (body: <code>expected_draft_version</code>; does not publish)</td><td>200</td><td>404, 409 <code>version_conflict</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>DELETE /articles/{id}/versions/{n}</code></td><td>Delete a version (no version check)</td><td>204</td><td>404, 409 <code>version_is_live</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /ai/draft</code> <em>(excluded; only if time remains, R15)</em></td><td>Generate a proposal (title, body, tags) from a topic with the Claude API. Writes nothing</td><td>200</td><td>422, 503 <code>ai_unavailable</code> (also when the prepaid credit is used up), 504 <code>ai_timeout</code>; the route does not exist unless <code>AI_ENABLED</code> is set</td></tr>
+<tr><td><span class="tag fe">Public</span></td><td><code>GET /public/articles?limit=&amp;offset=</code></td><td>Published list: slug, title, tags, <code>published_at</code>, updated date (only if republished); at most 100</td><td>200 (<code>[]</code> when empty)</td><td>—</td></tr>
+<tr><td><span class="tag fe">Public</span></td><td><code>GET /public/articles/{slug}</code></td><td>Title, tags and body of the live snapshot, from <b>one</b> JOIN</td><td>200</td><td>404 (never published, unpublished, missing or malformed slug: same body)</td></tr>
+<tr><td><span class="tag fe">Public</span></td><td><code>GET /healthz</code></td><td>Liveness; does not touch the database</td><td>200</td><td>—</td></tr>
+</table></div>
+<ul>
+  <li><b>Publish, unpublish and restore are POST sub-resources on purpose</b>: they are commands, not field updates, so <code>status</code> is never exposed to PATCH.</li>
+  <li>The version check is a request-body field (<code>expected_draft_version</code>), not <code>If-Match</code> / 412; this was considered and decided in U1.</li>
+  <li>The public list selects only title, tags and dates from the live snapshot (never <code>body</code>) in a single JOIN; the public detail is also one statement, so title and body always come from the same version.</li>
+  <li>The public API sends no long-lived <code>Cache-Control</code> (no caching), and writer responses send <code>no-store</code>.</li>
+</ul>
+
+<!-- 11 -->
+<h2 id="env">11. Environments and deployment (GCP Cloud Run + PostgreSQL)</h2>
+<p>The frontend and backend are deployed as separate Cloud Run services. The database is Cloud SQL for PostgreSQL. Locally, <code>docker compose up --build</code> starts PostgreSQL, the schema, the API and the web app from a fresh checkout (only Docker is needed).</p>
+
+<div class="fig">
+<svg viewBox="0 0 960 360" role="img" aria-label="Cloud Run architecture diagram">
+  <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect x="190" y="20" width="750" height="320" rx="14" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text class="s m" x="206" y="42">Google Cloud (region: asia-northeast1)</text>
+
+  <rect class="b-n" x="20" y="140" width="130" height="70" rx="10"/>
+  <text class="t" x="85" y="170" text-anchor="middle">Browser</text><text class="s m" x="85" y="190" text-anchor="middle">Public / writer</text>
+
+  <rect class="b-fe" x="225" y="100" width="210" height="150" rx="12"/>
+  <text class="t" x="330" y="125" text-anchor="middle">Cloud Run: web</text>
+  <text class="s m" x="330" y="145" text-anchor="middle">Next.js (docs-studio-web)</text>
+  <text class="s" x="330" y="175" text-anchor="middle">Public (/studio uses Basic auth)</text>
+  <text class="s" x="330" y="195" text-anchor="middle">env: API_BASE_URL</text>
+  <text class="s m" x="330" y="225" text-anchor="middle">cloudbuild.yaml (frontend)</text>
+
+  <rect class="b-be" x="500" y="100" width="210" height="150" rx="12"/>
+  <text class="t" x="605" y="125" text-anchor="middle">Cloud Run: api</text>
+  <text class="s m" x="605" y="145" text-anchor="middle">FastAPI (docs-studio-api)</text>
+  <text class="s" x="605" y="175" text-anchor="middle">Public (writer API uses Basic auth)</text>
+  <text class="s" x="605" y="195" text-anchor="middle">secrets: DATABASE_URL, BASIC_AUTH_*</text>
+  <text class="s m" x="605" y="225" text-anchor="middle">cloudbuild.yaml (backend)</text>
+
+  <rect class="b-be" x="500" y="270" width="210" height="52" rx="10" stroke-dasharray="5 3"/>
+  <text class="s" x="605" y="292" text-anchor="middle">Cloud Run Job: migrate</text><text class="s m" x="605" y="310" text-anchor="middle">alembic upgrade head (at deploy time)</text>
+
+  <path d="M790 120 v-8 a8 8 0 0 1 8 -8 h110 a8 8 0 0 1 8 8 v8" class="b-db"/>
+  <rect class="b-db" x="790" y="118" width="126" height="90" rx="0"/>
+  <ellipse class="b-db" cx="853" cy="118" rx="63" ry="12"/>
+  <ellipse class="b-db" cx="853" cy="208" rx="63" ry="12"/>
+  <text class="t" x="853" y="158" text-anchor="middle">Cloud SQL</text>
+  <text class="s" x="853" y="178" text-anchor="middle">PostgreSQL</text>
+
+  <path class="ln" marker-end="url(#ar5)" marker-start="url(#ar5)" d="M150 175 H225"/>
+  <text class="s m" x="187" y="164" text-anchor="middle">HTTPS</text>
+  <path class="ln" marker-end="url(#ar5)" marker-start="url(#ar5)" d="M435 175 H500"/>
+  <text class="s m" x="467" y="165" text-anchor="middle">HTTPS</text>
+  <path class="ln" marker-end="url(#ar5)" marker-start="url(#ar5)" d="M710 163 H790"/>
+  <text class="s m" x="750" y="152" text-anchor="middle">Unix</text><text class="s m" x="750" y="188" text-anchor="middle">socket</text>
+  <path class="ln d" marker-end="url(#ar5)" d="M710 296 H853 V222"/>
+</svg>
+<div class="cap">Both Cloud Run services are public, but the writer side (<code>/studio</code> and the writer API) is protected by Basic authentication.</div>
+</div>
+
+<h3>Configuration files (YAML)</h3>
+<div class="scroll"><table>
+<tr><th>File</th><th>Location</th><th>Role</th></tr>
+<tr><td><code>compose.yaml</code></td><td>repository root</td><td>Local run: PostgreSQL 17 for development (<code>db</code>) and tests (<code>db-test</code>), plus <code>migrate</code>, <code>backend</code> and <code>frontend</code> built from the Dockerfiles, so <code>docker compose up --build</code> runs everything. Part of the short setup command, so not low priority</td></tr>
+<tr><td><code>cloudbuild.yaml</code></td><td>backend</td><td>Build the image → push to Artifact Registry → run the migration Job → deploy to Cloud Run (api)</td></tr>
+<tr><td><code>cloudbuild.yaml</code></td><td>frontend</td><td>Build the image → push → deploy to Cloud Run (web). Passes <code>API_BASE_URL</code> as an environment variable</td></tr>
+</table></div>
+<p class="cap">Each project also has a <code>Dockerfile</code> and <code>.dockerignore</code> at its root (backend: python:3.12-slim + uv; frontend: a three-stage node:22-slim build). Docker Compose builds the same Dockerfiles for the local run, and Cloud Build builds them for Cloud Run. Both run as a non-root user. They have not been built or run yet (that needs <code>pyproject.toml</code> and <code>package.json</code>), so they must not be described as verified. The frontend Dockerfile also needs <code>output: "standalone"</code> in <code>next.config.ts</code>, and a <code>public/.gitkeep</code> so its <code>COPY</code> works.</p>
+
+<h3>Deployment flow</h3>
+<div class="flow">
+  <div class="n">gcloud builds submit</div><span class="a">→</span>
+  <div class="n be">Build / push image</div><span class="a">→</span>
+  <div class="n be">Run migrate Job</div><span class="a">→</span>
+  <div class="n be">Deploy api</div><span class="a">→</span>
+  <div class="n fe">Deploy web</div>
+</div>
+<p>The order is <b>migration → api → web</b>. If changes stay backward compatible (add → migrate → remove), things keep working even if a deployment stops partway.</p>
+
+<h3>Differences between environments</h3>
+<div class="scroll"><table>
+<tr><th>Item</th><th>Local</th><th>Cloud Run</th></tr>
+<tr><td>PostgreSQL</td><td>PostgreSQL 17 in Docker Compose (<code>db</code>, <code>db-test</code>); or Cloud SQL through the Auth Proxy on <code>localhost</code></td><td>Cloud SQL for PostgreSQL (Unix socket)</td></tr>
+<tr><td><code>DATABASE_URL</code></td><td><code>postgresql+asyncpg://USER:PASS@localhost:5432/app</code> (the Compose database; through the proxy for Cloud SQL)</td><td><code>database-url</code> in Secret Manager: <code>...@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE</code></td></tr>
+<tr><td>Database name</td><td><code>&lt;name&gt;_dev</code> for development; tests use <code>&lt;name&gt;_test</code> through <code>TEST_DATABASE_URL</code></td><td>The production database (never used locally)</td></tr>
+<tr><td>Migrations</td><td><code>uv run alembic upgrade head</code></td><td>Cloud Run Job (runs automatically at deploy time)</td></tr>
+<tr><td>Frontend → API</td><td><code>http://localhost:8000</code></td><td>The API's Cloud Run URL (no IAM authentication)</td></tr>
+<tr><td>Listening port</td><td>8000 / 3000</td><td>api = 8000, web = 3000 (set with <code>--port</code>)</td></tr>
+</table></div>
+
+<details class="opt"><summary>Deployment and operations details (not assessed; click to open)</summary>
+<h3>Operational settings</h3>
+<div class="scroll"><table>
+<tr><th>Topic</th><th>Setting</th></tr>
+<tr><td>Limits and cost</td><td><code>--max-instances</code> on both services (for example 3); <code>--cpu-boost</code>; <code>--min-instances=0</code> (cold starts of a few seconds are accepted). Cloud SQL is the main always-on cost: stop it when idle and remove it after the assessment.</td></tr>
+<tr><td>Migration Job</td><td><code>--max-retries=0</code> and a task timeout; migrations run in an advisory lock (<code>pg_advisory_lock</code>) so two builds cannot migrate at once; only additive, backward-compatible migrations ship in the same release as the code that needs them. Rolling back means shifting traffic to the previous revision, not a down-migration.</td></tr>
+<tr><td>Cloud Build</td><td>The build identity needs <code>roles/run.admin</code>, <code>roles/iam.serviceAccountUser</code> on the runtime service account, <code>roles/artifactregistry.writer</code> and <code>roles/logging.logWriter</code>; the <code>run</code>, <code>sqladmin</code>, <code>secretmanager</code>, <code>artifactregistry</code> and <code>cloudbuild</code> APIs must be on. Use <code>--set-cloudsql-instances</code> (not <code>--add-</code>) so the set is deterministic. A first step fails fast if <code>_SQL_INSTANCE</code> or <code>_RUNTIME_SA</code> is empty. <code>--allow-unauthenticated</code> fails if an organization policy blocks <code>allUsers</code>. (To be confirmed when deploying.)</td></tr>
+<tr><td>Container</td><td>Backend: respect <code>$PORT</code>, run uvicorn with <code>--proxy-headers --forwarded-allow-ips='*'</code>, <code>UV_NO_CACHE=1</code>, <code>UV_PYTHON_DOWNLOADS=never</code>, pin the uv image by digest. Frontend: <code>COPY --chown=app</code> so Next can write <code>.next/cache</code>.</td></tr>
+<tr><td>Security headers</td><td>The frontend sets CSP, <code>X-Content-Type-Options</code>, <code>Referrer-Policy</code>, <code>frame-ancestors 'none'</code> and HSTS (this also backs the Markdown XSS decision, U7). No CORS middleware is installed; Basic credentials are the only protection of the writer API, so use a random password of 24 characters or more and rely on the instance cap against guessing.</td></tr>
+<tr><td>Database</td><td>Automated backups and point-in-time recovery on; deletion protection on; SSL required. A least-privilege application user is separate from the migration (owner) user; special characters in the password are URL-encoded and the secret has no trailing newline.</td></tr>
+<tr><td>Logs and health</td><td>JSON logs with <code>severity</code> and the trace from <code>X-Cloud-Trace-Context</code>, plus a request ID. <code>/healthz</code> does not touch the database and is the startup probe. Migrations never run at boot.</td></tr>
+</table></div>
+</details>
+
+<details class="opt"><summary>AI draft generation (excluded from the plan; only if time remains; click to open)</summary>
+<h3>AI draft generation with the Claude API (excluded; only if time remains)</h3>
+<p>The API on Cloud Run can call the Claude API. Calling a pay-as-you-go cloud service could be hit without limit and run up an unbounded bill, so the cost is capped with <b>prepaid credit</b>: only a fixed amount is deposited, and the feature simply stops working when it is used up. It is <b>excluded from the planned implementation</b> and from the assessed scope, and is added only if time remains after the core features, the invariant tests, the README and the adopted optional features are all done (section 13, R15).</p>
+<div class="flow">
+  <div class="n fe">Edit form: "Generate a draft" + topic</div><span class="a">→</span>
+  <div class="n be">POST /ai/draft (Basic auth)</div><span class="a">→</span>
+  <div class="n">Claude API (key from Secret Manager)</div><span class="a">→</span>
+  <div class="n be">Normalize and clip the result</div><span class="a">→</span>
+  <div class="n fe">Form shows a proposal</div><span class="a">→</span>
+  <div class="n be">Writer saves with PATCH (<code>expected_draft_version</code>)</div>
+</div>
+<ul>
+  <li><b>It never writes.</b> The endpoint only returns a proposal. The text enters the draft through the normal edit, so the invariants are untouched, and nothing is published until the writer publishes.</li>
+  <li><b>Spending is capped by the prepaid credit.</b> In the Anthropic Console, keep automatic reload off and set a workspace spend limit (to be confirmed when it is built). When the credit is used up, the route returns 503 <code>ai_unavailable</code> and the rest of the site is unaffected.</li>
+  <li>The Claude client is behind a small interface (<code>DraftGenerator</code>). Tests use a fake, so <code>make test</code> needs no key and costs nothing.</li>
+  <li>Setup: store the key in Secret Manager as <code>anthropic-api-key</code> and pass it as <code>ANTHROPIC_API_KEY</code>; set <code>AI_ENABLED=true</code> and <code>ANTHROPIC_MODEL</code> (a small, inexpensive model, chosen and confirmed when it is built). The key is never written in code or logged. Cloud Run needs no extra permission for this.</li>
+  <li>Further guards: off by default; 30 second timeout; limits on input length and output tokens; a per-instance rate limit; the instance cap; the prompt text is not logged in full.</li>
+  <li>The output is treated like any other input (tags lowercased and limited to 10, title 200 characters, body 100,000) and rendered through the same sanitizer (U7), so generated text cannot inject HTML. The topic text is sent to the Claude API.</li>
+</ul>
+</details>
+
+<h3>How the work is assessed</h3>
+<p>Assessors cannot reach our Cloud SQL, so they verify the behaviour on the <b>deployed Cloud Run site</b>. The URL is the first thing in the README, and the Basic authentication credentials are shared outside the repository. Cloud SQL and the Cloud Run services must be running while the work is assessed. <code>make setup</code> and <code>make dev</code> still work against any PostgreSQL given by <code>DATABASE_URL</code>.</p>
+
+<div class="note"><b>The writer side uses Basic authentication (required in production, off by default for a local run):</b> Authentication is Out of Scope in the assignment, but to avoid letting anyone edit, publish or delete on the deployed site, Basic authentication is added to the writer side only (<code>/studio</code> and the writer API). FastAPI does the verification (so the API is protected even when called directly), and Next.js forwards the <code>Authorization</code> header. The public site and the public API (<code>/api/v1/public/*</code>) need no authentication. The ID and password are supplied through environment variables (Secret Manager in production).</div>
+
+<!-- 12 -->
+<h2 id="tests">12. Test plan and build order</h2>
+<p>Automated tests are mandatory and matter more than UI tests. Each invariant has at least one test, and <code>make test</code> runs all of them. The tests run on a real PostgreSQL (the <code>_test</code> database), never on mocks, because the guarantees live in the database.</p>
+
+<h3>At a glance: what protects each invariant, and how many tests cover it</h3>
+<div class="scroll"><table>
+<tr><th>Invariant</th><th>Application rule</th><th>Database guard</th><th>Automated tests</th></tr>
+<tr><td>INV-1 Snapshots are immutable</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-2 Publish is atomic</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-3 The protected version cannot be deleted</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:110px"></span> 5</td></tr><tr><td>INV-4 Restore keeps history intact</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>INV-5 Concurrent edits are detected</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-6 History survives Unpublish</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>Idempotent Publish (U8)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>Slug collision handling (U15)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>AI draft generation (R15, optional)</td><td><code>test_ai_draft_returns_proposal_and_writes_nothing</code> (fake client); <code>test_ai_draft_requires_basic_auth</code>; <code>test_ai_upstream_error_or_used_up_credit_gives_503</code>; <code>test_ai_output_is_normalized_and_clipped</code>; <code>test_ai_route_absent_when_disabled</code> (<code>tests/api</code>; no test calls the Claude API)</td></tr>
+<tr><td>Public side (FR-10 to FR-12)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>Basic authentication (FR-13)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr>
+</table></div>
+<p class="cap">A filled dot means the rule is enforced there. Every invariant has at least one automated test, and most are guarded twice (application and database).</p>
+
+<h3>12.1 Tests per invariant (named so they can be found)</h3>
+<div class="scroll"><table>
+<tr><th>Invariant / operation</th><th>Tests (<code>tests/integration</code> unless noted)</th></tr>
+<tr><td>INV-1 snapshots are immutable</td><td><code>test_publish_creates_snapshot_from_draft</code>; <code>test_editing_draft_after_publish_leaves_snapshot_and_public_page</code>; <code>test_raw_update_on_version_rejected_by_trigger</code>; <code>test_truncate_versions_rejected</code></td></tr>
+<tr><td>INV-2 Publish is atomic</td><td><code>test_publish_rolls_back_on_failure_at_each_step</code> (parametrized over the steps; asserts no new row and unchanged <code>status</code>, pointer, <code>published_at</code>, <code>draft_version</code>, <code>last_version_number</code>); <code>test_concurrent_publish_exactly_one_201_other_409</code> (<code>asyncio.gather</code>, separate connections, no 5xx, contiguous numbers); <code>test_check_rejects_published_without_pointer_or_published_at</code>; <code>test_guard_blocks_return_to_draft_and_pointer_moving_back</code></td></tr>
+<tr><td>INV-3 the protected version cannot be deleted</td><td><code>test_delete_live_version_409</code>; <code>test_delete_after_unpublish_409</code>; <code>test_delete_old_version_after_republish_204</code>; <code>test_delete_vs_publish_race_no_5xx_no_dangling_pointer</code>; <code>test_delete_missing_version_404</code></td></tr>
+<tr><td>INV-4 Restore keeps history intact</td><td><code>test_restore_copies_only_draft_and_leaves_all_versions_identical</code> (compares every column of every row); <code>test_restore_on_unpublished_never_published_published_keeps_status_pointer_published_at</code>; <code>test_restore_missing_version_404</code></td></tr>
+<tr><td>INV-5 concurrent edits</td><td><code>test_stale_edit_409_and_nothing_changes</code>; <code>test_draft_version_increments_on_edit_restore_and_publish_only</code>; <code>test_edit_vs_restore_exactly_one_wins</code>; <code>test_publish_with_stale_expected_version_409_no_snapshot</code></td></tr>
+<tr><td>INV-6 history survives Unpublish</td><td><code>test_unpublish_keeps_snapshot_pointer_and_published_at</code>; <code>test_republish_keeps_first_published_at</code>; <code>test_unpublish_non_published_409</code></td></tr>
+<tr><td>Idempotent Publish (U8)</td><td><code>test_publish_unchanged_draft_returns_200_and_one_version</code>; <code>test_draft_equal_to_old_version_creates_new_version</code>; <code>test_publish_unchanged_after_unpublish_flips_status_only</code></td></tr>
+<tr><td>Slug collision handling (U15)</td><td><code>test_create_with_taken_slug_gets_numeric_suffix</code>; <code>test_concurrent_creates_with_same_slug_get_distinct_slugs_no_500</code>; <code>test_suffix_keeps_slug_within_100_chars</code>; <code>test_slug_cannot_be_changed_after_creation</code></td></tr>
+<tr><td>Public side (FR-10 to FR-12)</td><td><code>test_public_detail_reads_snapshot_not_draft</code>; <code>test_public_404_never_published_unpublished_missing_and_malformed_slug_identical</code>; <code>test_public_list_shape_and_order</code>; <code>test_public_schema_has_no_draft_fields</code> (<code>tests/api</code>)</td></tr>
+<tr><td>Authentication (FR-13)</td><td><code>test_every_writer_route_requires_basic_auth</code> (sweeps <code>app.routes</code>); <code>test_auth_checked_before_404_and_422</code>; <code>test_public_route_ignores_authorization_header</code>; <code>test_app_refuses_to_start_in_prod_unless_auth_enabled_with_credentials</code>; <code>test_enabled_auth_with_empty_credentials_refuses_to_start</code>; <code>test_auth_off_locally_lets_writer_routes_through_and_warns</code> (<code>tests/api</code>)</td></tr>
+<tr><td>Test safety</td><td><code>test_guard_aborts_unless_database_name_ends_in_test_and_host_is_local</code> (<code>tests/unit</code>)</td></tr>
+<tr><td>Frontend</td><td>Markdown sanitization (<code>javascript:</code> link, raw <code>&lt;script&gt;</code>); type check; lint; the generated OpenAPI types are current (<code>make check-api</code>)</td></tr>
+</table></div>
+
+<h3>12.2 Build order (the order the tasks follow)</h3>
+<div class="flow">
+  <div class="n">1. Constitution, spec, plan, tasks (committed first)</div><span class="a">→</span>
+  <div class="n db">2. Schema (<code>001_schema.sql</code>) and its constraint tests</div><span class="a">→</span>
+  <div class="n be">3. Service lifecycle, one invariant at a time, test first</div><span class="a">→</span>
+  <div class="n be">4. Writer API, then public API</div><span class="a">→</span>
+  <div class="n fe">5. Minimal UI</div><span class="a">→</span>
+  <div class="n">6. README, then Cloud Run</div>
+</div>
+<ul>
+  <li>The specification is committed before any file under <code>backend/src</code> or <code>frontend/src</code>; <code>scripts/check-spec-first.sh</code> verifies this order.</li>
+  <li>For each invariant, the failing test is written before the code that satisfies it, and the invariants are finished before the UI and the deployment files are started.</li>
+  <li>If time runs short, stop adding features, finish the invariants and their tests, and list what is not done (and how it would be built) in the README.</li>
+</ul>
+
+<footer>This document lives in <code>docs/</code> at the repository root and is shared by the frontend and backend. The Japanese version is in <code>docs/ja/</code>.</footer>
+</div>
+</body>
+</html>

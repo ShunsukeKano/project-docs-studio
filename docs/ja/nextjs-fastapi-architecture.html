@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Next.js × FastAPI アーキテクチャ</title>
+<style>
+:root{
+  /* Accenture-style palette: core purple as the lead colour, with black, white and grey */
+  --bg:#ffffff; --card:#ffffff; --fg:#000000; --muted:#5e5e5e; --border:#d8d3e0;
+  --fe:#a100ff; --fe-bg:#f1e6ff;      /* フロント: コアパープル */
+  --be:#000000; --be-bg:#ececec;      /* バック: ブラック */
+  --db:#7500c0; --db-bg:#e6dcff;      /* DB: 濃いパープル */
+  --warn:#c8102e; --warn-bg:#fde8eb;
+  --code-bg:#efecf3;
+}
+body::before{content:"";display:block;height:8px;background:linear-gradient(90deg,#460073,#7500c0,#a100ff)}
+html{background:#ffffff;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.7 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:30px;margin:0 0 6px;letter-spacing:.01em}
+h2{font-size:22px;margin:48px 0 12px;padding-top:10px;border-top:3px solid var(--fe)}
+h3{font-size:17px;margin:28px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--muted);margin-bottom:20px}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
+nav.toc a{font-size:13px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:var(--fg);text-decoration:none;background:var(--card)}
+nav.toc a:hover{border-color:var(--fe);color:var(--fe)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:12px 0}
+.fig{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0;overflow-x:auto}
+.fig svg{display:block;min-width:640px;width:100%;height:auto}
+.cap{font-size:13px;color:var(--muted);margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:14px;background:var(--card)}
+th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--code-bg);font-weight:600;border-bottom:2px solid var(--fe)}
+.scroll{overflow-x:auto}
+code{background:var(--code-bg);padding:1px 6px;border-radius:4px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code-bg);padding:14px;border-radius:10px;overflow-x:auto;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin:10px 0}
+pre code{background:none;padding:0}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;font-weight:600}
+.tag.fe{background:var(--fe-bg);color:var(--fe)} .tag.be{background:var(--be-bg);color:var(--be)} .tag.db{background:var(--db-bg);color:var(--db)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.layer{border:1px solid var(--border);border-left:5px solid var(--be);background:var(--card);border-radius:8px;padding:10px 14px;margin:8px 0}
+.layer b{display:block}
+.layer span{font-size:14px;color:var(--muted)}
+.layer.fe{border-left-color:var(--fe)}
+.layer.db{border-left-color:var(--db)}
+.note{border-left:4px solid var(--warn);background:var(--warn-bg);padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+.ok{border-left:4px solid var(--fe);background:var(--fe-bg);padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0}
+.flow .n{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-size:14px}
+.flow .n.fe{border-color:var(--fe);background:var(--fe-bg)} .flow .n.be{border-color:var(--be);background:var(--be-bg)}
+.flow .a{color:var(--muted)}
+.tree{font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+.bar{display:inline-block;height:10px;background:var(--fe);border-radius:3px;vertical-align:middle}
+.dot{color:var(--fe);font-weight:700}
+.none{color:var(--muted)}
+.toc a.core,nav.toc a.core{border-color:var(--fe);font-weight:600}
+details.opt{border:1px dashed var(--border);border-radius:10px;padding:8px 14px;margin:14px 0}
+details.opt>summary{cursor:pointer;font-weight:600;color:var(--muted)}
+footer{margin-top:48px;color:var(--muted);font-size:13px}
+/* svg */
+svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+.t{font-size:14px;font-weight:600} .s{font-size:12px} .m{fill:var(--muted)!important}
+.b-fe{fill:var(--fe-bg);stroke:var(--fe);stroke-width:1.5}
+.b-be{fill:var(--be-bg);stroke:var(--be);stroke-width:1.5}
+.b-db{fill:var(--db-bg);stroke:var(--db);stroke-width:1.5}
+.b-n{fill:var(--card);stroke:var(--border);stroke-width:1.5}
+.b-w{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.5}
+.ln{stroke:var(--muted);stroke-width:1.6;fill:none}
+.ln.d{stroke-dasharray:6 4}
+.ll{stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 4}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Next.js × FastAPI アーキテクチャ</h1>
+<p class="lead">フロントエンド（<code>frontend</code>）とバックエンド（<code>backend</code>）を別フォルダで管理し、FastAPI を <code>src/app/</code> に置く構成の全体像です。図と DB 構造を中心にまとめています。</p>
+<div class="note"><b>この資料の位置づけ:</b> 構成の「あるべき姿」を示す参考資料です。個別機能（Docs Studio）の確定仕様・API・タスクは、Spec Kit の成果物 <code>specs/001-docs-studio/</code>（spec.md / plan.md / tasks.md）が正です。食い違いがあれば specs 側を優先し、こちらを更新してください。</div>
+<div class="ok"><b>読み方:</b> 評価にとって特に重要な部分に ★ を付けています。リクエストの流れ（3）、DB 構造（7）、状態遷移と操作の一覧（8）、Publish と排他制御（9）、API（10）、テスト計画（12）です。4〜6 節はそれを支える内容です。11 節のデプロイの詳細とAI 機能（計画から除外）は、評価の対象外なので折りたたんであります。</div>
+
+<nav class="toc">
+  <a href="#overview">1. 全体像</a><a href="#roles">2. 責務</a><a class="core" href="#flow">★ 3. リクエストの流れ</a>
+  <a href="#backend">4. バックエンド構成</a><a href="#frontend">5. フロントエンド構成</a><a href="#types">6. 型の合わせ方</a>
+  <a class="core" href="#db">★ 7. DB構造</a><a class="core" href="#state">★ 8. 記事の状態遷移</a><a class="core" href="#publish">★ 9. Publish と排他制御</a>
+  <a class="core" href="#api">★ 10. API 一覧（案）</a><a href="#env">11. 環境・デプロイ</a><a class="core" href="#tests">★ 12. テスト計画とビルド順</a>
+</nav>
+
+<!-- 1 -->
+<h2 id="overview">1. 全体像</h2>
+<p>通常、ブラウザは Next.js サーバーとだけ通信し、FastAPI を直接呼びません。トークンや内部 URL がブラウザに出ず、CORS も原則いりません。</p>
+<div class="fig">
+<svg viewBox="0 0 960 285" role="img" aria-label="全体構成図">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+
+  <rect class="b-n" x="20" y="105" width="140" height="80" rx="10"/>
+  <text class="t" x="90" y="140" text-anchor="middle">ブラウザ</text>
+  <text class="s m" x="90" y="160" text-anchor="middle">利用者 / ライター</text>
+
+  <rect class="b-fe" x="225" y="40" width="255" height="215" rx="12"/>
+  <text class="t" x="352" y="64" text-anchor="middle">Next.js サーバー（frontend）</text>
+  <rect class="b-n" x="243" y="78" width="219" height="30" rx="6"/><text class="s" x="352" y="98" text-anchor="middle">proxy.ts（振り分けと認証の要求）</text>
+  <rect class="b-n" x="243" y="116" width="219" height="30" rx="6"/><text class="s" x="352" y="136" text-anchor="middle">Server Components（読み取り）</text>
+  <rect class="b-n" x="243" y="154" width="219" height="30" rx="6"/><text class="s" x="352" y="174" text-anchor="middle">Server Actions（更新）</text>
+  <rect class="b-n" x="243" y="192" width="219" height="46" rx="6"/><text class="s" x="352" y="212" text-anchor="middle">API クライアント（openapi-fetch）</text><text class="s m" x="352" y="228" text-anchor="middle">型は openapi.json から生成</text>
+
+  <rect class="b-be" x="545" y="40" width="215" height="215" rx="12"/>
+  <text class="t" x="652" y="64" text-anchor="middle">FastAPI（backend）</text>
+  <rect class="b-n" x="563" y="78" width="179" height="34" rx="6"/><text class="s" x="652" y="100" text-anchor="middle">Router（HTTP の入出力）</text>
+  <rect class="b-n" x="563" y="120" width="179" height="34" rx="6"/><text class="s" x="652" y="142" text-anchor="middle">Service（業務ルール）</text>
+  <rect class="b-n" x="563" y="162" width="179" height="34" rx="6"/><text class="s" x="652" y="184" text-anchor="middle">Repository（SQL）</text>
+  <rect class="b-n" x="563" y="204" width="179" height="34" rx="6"/><text class="s" x="652" y="226" text-anchor="middle">Schema（Pydantic）</text>
+
+  <path d="M830 130 v-12 a8 8 0 0 1 8 -8 h82 a8 8 0 0 1 8 8 v12" class="b-db"/>
+  <rect class="b-db" x="830" y="125" width="100" height="70" rx="0"/>
+  <ellipse class="b-db" cx="880" cy="125" rx="50" ry="12"/>
+  <ellipse class="b-db" cx="880" cy="195" rx="50" ry="12"/>
+  <text class="t" x="880" y="165" text-anchor="middle">PostgreSQL</text>
+
+  <path class="ln" marker-end="url(#ar)" marker-start="url(#ar)" d="M160 145 H225"/>
+  <text class="s m" x="192" y="132" text-anchor="middle">HTML</text><text class="s m" x="192" y="168" text-anchor="middle">Basic</text>
+  <path class="ln" marker-end="url(#ar)" marker-start="url(#ar)" d="M480 145 H545"/>
+  <text class="s m" x="512" y="132" text-anchor="middle">JSON</text><text class="s m" x="512" y="168" text-anchor="middle">Basic</text>
+  <path class="ln" marker-end="url(#ar)" marker-start="url(#ar)" d="M760 160 H830"/>
+  <text class="s m" x="795" y="148" text-anchor="middle">SQL</text>
+
+</svg>
+<div class="cap">線は実行時の通信を表す。ブラウザから FastAPI を直接叩かないのが基本。</div>
+</div>
+
+<!-- 2 -->
+<h2 id="roles">2. 責務の分担</h2>
+<div class="scroll"><table>
+<tr><th>領域</th><th>担当</th><th>やること</th><th>やらないこと</th></tr>
+<tr><td><span class="tag fe">frontend</span></td><td>表示と薄い BFF</td><td>画面、認証情報の転送、FastAPI の呼び出し、入力の即時チェック（Zod）</td><td>業務ロジック、認可の最終判断、DB アクセス</td></tr>
+<tr><td><span class="tag be">backend</span></td><td>業務ロジックとデータの唯一の持ち主</td><td>状態遷移、不変条件の強制、トランザクション、認可、最終的な入力検証（Pydantic）</td><td>画面の都合</td></tr>
+<tr><td><span class="tag db">PostgreSQL</span></td><td>永続化と最後の砦</td><td>制約（UNIQUE / CHECK / FK）、トランザクション、履歴の不変性（トリガー）</td><td>アプリのルールを DB だけに任せきること</td></tr>
+</table></div>
+
+<!-- 3 -->
+<h2 id="flow">3. リクエストの流れ</h2>
+<h3>3.1 公開ドキュメントを読む（未認証）</h3>
+<div class="flow">
+  <div class="n">ブラウザ</div><span class="a">→</span>
+  <div class="n fe">Server Component<br><small>/docs/[slug]</small></div><span class="a">→</span>
+  <div class="n be">GET /public/articles/{slug}</div><span class="a">→</span>
+  <div class="n be">Service<br><small>公開中スナップショットを取得</small></div><span class="a">→</span>
+  <div class="n">article_versions</div>
+</div>
+<p>下書きの列（<code>draft_*</code>）は読みません。未公開・公開停止の記事は Service が <code>NotFoundError</code> を投げ、404 になります。</p>
+
+<h3>3.2 ライターが Publish する</h3>
+<div class="fig">
+<svg viewBox="0 0 960 445" role="img" aria-label="Publish のシーケンス">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <g class="t">
+    <rect class="b-n" x="30" y="10" width="150" height="36" rx="8"/><text x="105" y="33" text-anchor="middle">ライター画面</text>
+    <rect class="b-fe" x="270" y="10" width="170" height="36" rx="8"/><text x="355" y="33" text-anchor="middle">Server Action</text>
+    <rect class="b-be" x="530" y="10" width="170" height="36" rx="8"/><text x="615" y="33" text-anchor="middle">FastAPI</text>
+    <rect class="b-db" x="790" y="10" width="140" height="36" rx="8"/><text x="860" y="33" text-anchor="middle">PostgreSQL</text>
+  </g>
+  <line class="ll" x1="105" y1="46" x2="105" y2="435"/><line class="ll" x1="355" y1="46" x2="355" y2="435"/>
+  <line class="ll" x1="615" y1="46" x2="615" y2="435"/><line class="ll" x1="860" y1="46" x2="860" y2="435"/>
+
+  <path class="ln" marker-end="url(#ar2)" d="M105 80 H355"/><text class="s" x="230" y="73" text-anchor="middle">「公開」ボタン</text>
+  <path class="ln" marker-end="url(#ar2)" d="M355 115 H615"/><text class="s" x="485" y="108" text-anchor="middle">POST /articles/{id}/publish + expected_draft_version</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 150 H860"/><text class="s" x="738" y="143" text-anchor="middle">BEGIN</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 185 H860"/><text class="s" x="738" y="178" text-anchor="middle">1. 記事の行をロック（FOR UPDATE）</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 220 H860"/><text class="s" x="738" y="213" text-anchor="middle">2. 版が古い → 409（何も変えない）</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 255 H860"/><text class="s" x="738" y="248" text-anchor="middle">3. 公開中の版と同じ内容 → 200（何もしない）</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 290 H860"/><text class="s" x="738" y="283" text-anchor="middle">4. カウンタ +1、スナップショットを INSERT</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 325 H860"/><text class="s" x="738" y="318" text-anchor="middle">5. status / 参照 / published_at を UPDATE</text>
+  <path class="ln" marker-end="url(#ar2)" d="M615 360 H860"/><text class="s" x="738" y="353" text-anchor="middle">COMMIT（4・5 は全部成功か全部失敗）</text>
+  <path class="ln d" marker-end="url(#ar2)" d="M615 392 H355"/><text class="s" x="485" y="385" text-anchor="middle">201 + 新バージョン（または 200 / 409 / 422）</text>
+  <path class="ln d" marker-end="url(#ar2)" d="M355 425 H105"/><text class="s" x="230" y="418" text-anchor="middle">再描画（ページは動的で、キャッシュしない）</text>
+</svg>
+<div class="cap">4・5 の途中で失敗したら ROLLBACK され、「公開済みなのに参照がない」状態は生まれません。編集と Restore も、同じロックと同じ版の確認を使います。</div>
+</div>
+
+<!-- 4 -->
+<h2 id="backend">4. バックエンド構成（backend）</h2>
+<div class="grid2">
+<div>
+<h3>レイヤー</h3>
+<div class="layer"><b>Router</b><span>api/v1/routes/*.py — 入力の受け取り、response_model、ステータスコード。ロジックは書かない</span></div>
+<div class="layer"><b>Service</b><span>domains/*/service.py — 業務ルール、状態遷移、トランザクション（リクエストごとに1つのセッションと1つの <code>async with session.begin()</code>）。コミットするのはこの層だけ。HTTPException は投げない。テストはこの層を対象にする</span></div>
+<div class="layer"><b>Repository（薄く、任意）</b><span>domains/*/repository.py — 切り出す価値のあるロックとスナップショットの SQL だけ。ORM をなぞるだけのラッパーは書かない。コミットしない</span></div>
+<div class="layer db"><b>Model / Schema</b><span>models.py（テーブル）と schemas.py（入出力の型）。ORM をそのまま返さない。セッションは <code>expire_on_commit=False</code></span></div>
+<p class="cap">依存は上から下の一方向。例外は <code>AppError</code> 系で投げ、HTTP への変換は例外ハンドラ1か所。</p>
+<h3>セキュア・バイ・デフォルト</h3>
+<ul>
+  <li>ルーターは2つ。<b>書き手</b>のルーターはルーター全体に <code>dependencies=[Depends(require_basic_auth)]</code> を付け、<b>公開</b>のルーター（<code>/public/*</code>）には付けない。新しい書き手のルートは、誰も確認を足さなくても保護される。</li>
+  <li>認証は、明示的な設定 <code>BASIC_AUTH_ENABLED</code> で切り替えます。本番では必須で、ローカルの実行では既定でオフ（サンプルの環境ファイルがオフにしてある）なので、新規の実行は課題文の記述どおりに動きます。オフのときは、起動時に警告を出します。暗黙のフォールバックにはしません。</li>
+  <li>認証を有効にして、<code>app.routes</code> を走査するテストが、<code>/api/v1/public</code> と <code>/healthz</code> 以外のルートが、認証情報なしで 401 を返さなければ失敗する。</li>
+  <li>認証は依存なので、本文の検証より前に動く。401 は 404 と 422 より先。</li>
+  <li>認証情報は UTF-8 のバイト列にして <code>secrets.compare_digest</code> で、途中で打ち切らずに比べる。<code>Authorization</code> ヘッダーはログに出さない。認証が有効で変数が空なら起動しない（本番では、認証が有効でなければ起動しない）。本番では <code>/docs</code> と <code>/openapi.json</code> を無効にする。CORS のミドルウェアは入れない。</li>
+</ul>
+</div>
+<div>
+<h3>フォルダ</h3>
+<pre class="tree">backend/
+├─ pyproject.toml / uv.lock
+├─ db-automation-apply/ … DDL（001_schema.sql）
+├─ alembic/ ………… マイグレーション
+├─ openapi.json …… フロントと共有する契約
+├─ scripts/export_openapi.py（DB 不要）
+├─ src/app/
+│  ├─ main.py ………… create_app()
+│  ├─ core/ ………… config, security, exceptions
+│  ├─ db/ ………… base, session
+│  ├─ api/
+│  │  ├─ deps.py
+│  │  └─ v1/routes/ … articles（書き手）, public
+│  └─ domains/
+│     └─ articles/
+│        ├─ models.py
+│        ├─ schemas.py
+│        ├─ repository.py（薄く）
+│        └─ service.py
+└─ tests/ ………… src の外に置く
+   ├─ unit/ ……… DB が要らない規則
+   ├─ integration/ … 本物の _test PostgreSQL: 同時実行、クラッシュ注入、トリガー
+   └─ api/ ………… 認証の組み合わせ、ステータスコード、ルート走査</pre>
+<p class="cap">仕様は、各プロジェクトのフォルダの中ではなく、リポジトリ直下の <code>specs/001-docs-studio/</code> に置きます。</p>
+</div>
+</div>
+<h3>エラーの形（統一し、OpenAPI にも宣言する）</h3>
+<pre><code>{ "error": { "code": "version_conflict", "message": "...", "details": { "current_draft_version": 7 } } }</code></pre>
+<p>コード: <code>unauthorized</code>、<code>not_found</code>、<code>validation_error</code>、<code>version_conflict</code>、<code>empty_content</code>、<code>not_published</code>、<code>version_is_live</code>、<code>slug_conflict</code>。FastAPI 既定の 422 の本文はこの形に置き換え、各ルートがエラー応答を宣言する（<code>responses={404: ..., 409: ...}</code>）ので、生成される TypeScript のクライアントは、エラーを <code>unknown</code> ではなく型つきで扱える。</p>
+
+<!-- 5 -->
+<h2 id="frontend">5. フロントエンド構成（frontend）</h2>
+<div class="grid2">
+<div>
+<h3>使い分け</h3>
+<div class="scroll"><table>
+<tr><th>やりたいこと</th><th>使う仕組み</th></tr>
+<tr><td>一覧・詳細の表示</td><td>Server Component（動的、キャッシュしない）</td></tr>
+<tr><td>作成・編集・公開などの更新</td><td>Server Action</td></tr>
+<tr><td>未認証の書き手にサインインを求める</td><td>proxy.ts がヘッダーの有無を確認し、route handler が 401 の要求を返す</td></tr>
+<tr><td>編集フォームとプレビュー</td><td>Client Component（フォームだけ）</td></tr>
+</table></div>
+<p class="cap">読み取りはサーバー側で完結。ブラウザに渡る JS を最小にします。</p>
+</div>
+<div>
+<h3>フォルダ</h3>
+<pre class="tree">frontend/
+├─ package.json / pnpm-lock.yaml
+├─ public/ ………… （.gitkeep を置き、Docker の COPY を通す）
+└─ src/
+   ├─ proxy.ts
+   ├─ app/
+   │  ├─ (public)/docs/[slug]/page.tsx
+   │  ├─ (public)/docs/page.tsx
+   │  ├─ (studio)/studio/
+   │  │  ├─ page.tsx ………… 記事一覧
+   │  │  ├─ [id]/page.tsx … 編集 + 履歴
+   │  │  └─ actions.ts …… Server Actions
+   │  └─ auth/challenge/route.ts … 401 + WWW-Authenticate を返す
+   ├─ features/articles/ … 画面部品
+   ├─ components/ui/
+   └─ lib/
+      ├─ api/generated/ … 自動生成
+      ├─ api/server-client.ts
+      ├─ markdown.ts ……… 共通のレンダラーとサニタイザー
+      └─ env.ts ………… 遅延して検証する</pre>
+</div>
+</div>
+
+<h3>5.1 Server Action 経由の Basic 認証</h3>
+<ul>
+  <li>Server Action はサーバーで動き、自分では <code>Authorization</code> ヘッダーを持たない。受け取ったヘッダーを <code>headers().get("authorization")</code> で読み、API を呼ぶたびに渡す。API クライアントは、ヘッダーを呼び出しごとに受け取り、モジュールのシングルトンには持たせない。</li>
+  <li>検証するのは FastAPI だけ。<code>proxy.ts</code> は、<code>/studio/**</code> のすべてのリクエスト（action の POST を含む）でヘッダーがあるかを確認するだけで、検証はできない。</li>
+  <li>API が 401 を返したら、action はそれを呼び出し元に伝え、ページは <code>/auth/challenge</code> にリダイレクトする。これは route handler で、<code>WWW-Authenticate: Basic realm="studio"</code> つきの <code>401</code> を返す。Server Action は、そのレスポンスヘッダーを自分では設定できない。</li>
+  <li>ブラウザは Basic 認証の認証情報を、realm とパスごとに覚える。ログアウトはなく、この範囲では許容する。</li>
+</ul>
+
+<h3>5.2 公開ページはキャッシュしない</h3>
+<ul>
+  <li>公開ページは <code>export const dynamic = "force-dynamic"</code>（API の fetch は <code>cache: "no-store"</code>）にする。公開停止が次のリクエストから効き、ビルド時にデータを取りに行かない。キャッシュ層は対象外で、古いページが残ると 404 の要件を破る。</li>
+  <li><code>API_BASE_URL</code> は、実行時だけのサーバー変数で、<code>NEXT_PUBLIC_*</code> にはしない。<code>env.ts</code> は遅延して（クライアントを作る関数の中で）検証するので、<code>next build</code> には要らない。</li>
+</ul>
+
+<h3>5.3 Markdown の描画</h3>
+<ul>
+  <li>保存する本文は Markdown のまま。バックエンドは描画しない。公開側の Server Component がサーバーで描画する（生の HTML は描画せず、<code>rehype-sanitize</code> を使い、リンクは <code>http</code>、<code>https</code>、<code>mailto</code> に限る）ので、読者に Markdown ライブラリは配信しない。</li>
+  <li>書き手のプレビューは Client Component で、同じ <code>lib/markdown.ts</code> を使うので、プレビューと公開ページは食い違わない。<code>javascript:</code> のリンクと生の <code>&lt;script&gt;</code> をテストで確認する。</li>
+</ul>
+
+<h3>5.4 編集画面と競合したときの流れ</h3>
+<ul>
+  <li>ページは Server Component で、下書きと <code>draft_version</code> を取得し、小さなクライアントのフォーム（<code>useActionState</code>）に両方を渡す。保存では、フォームを**読み込んだときの** <code>draft_version</code> を送る。取り直した値は送らない。</li>
+  <li>409 <code>version_conflict</code> のとき、action は書き手の入力を捨てず、サーバー側の現在の版を返す。フォームは両方を見せ、最新を読み込み直すか、新しい版に対して再送するかを選ばせる（FR-16）。</li>
+  <li>Publish や Restore に成功したら、action は新しい <code>draft_version</code> をフォームに返す。</li>
+</ul>
+
+<h3>5.5 404 とメタデータ</h3>
+<ul>
+  <li>API が 404 を返したら、Server Component は <code>notFound()</code> を呼ぶ。これで本物の 404 ステータスになる。「見つかりません」と 200 で描画することはしない。一度も公開されていない記事と、公開停止の記事は、同じに見える。</li>
+  <li><code>generateMetadata</code> は、公開中スナップショットから title と description を取る。<code>/studio</code> は <code>noindex</code>。</li>
+</ul>
+
+<h3>5.6 スタイル</h3>
+<ul>
+  <li>Tailwind CSS だけを使い、コンポーネントライブラリは使いません。落ち着いた配色に<b>アクセントの色は1色</b>、システムフォント、ゆったりした余白、読みやすい本文の幅。ライトテーマのみです。</li>
+  <li><code>src/components/ui/</code> に、共通の小さな部品（ボタン、入力欄、テキストエリア、タグ、状態バッジ、空の状態）を置き、キーボードフォーカスを見えるようにし、スマートフォンからデスクトップの幅まで崩れないレイアウトにします。</li>
+  <li>これは、<b>機能とそのテストが済んだあとの、時間を区切った仕上げ</b>です（13 節 R16）。見た目は評価されないので、不変条件を遅らせることはありません。</li>
+</ul>
+
+<!-- 6 -->
+<h2 id="types">6. 型の合わせ方（API の仕様書から自動生成）</h2>
+<div class="note"><b>OpenAPI と OpenAI は別物です。</b> OpenAPI は「API の仕様書を機械が読める形で書く」ための標準的な書式（旧称 Swagger）で、AI とは関係ありません。FastAPI は、書いたコードから自動でこの仕様書を作ってくれます。</div>
+
+<h3>なぜ必要か</h3>
+<p>バックエンドの API が返すデータの形と、フロントエンドが想定している型が食い違うと、画面が壊れても動かすまで気づけません。そこで「バックエンドの定義を正」とし、フロントの型はそこから<b>自動で作る</b>ことで、食い違いをなくします。</p>
+
+<h3>流れ</h3>
+<div class="flow">
+  <div class="n be">① backend: 入出力の型（Pydantic）を変更</div><span class="a">→</span>
+  <div class="n be">② FastAPI が API の仕様書 <code>openapi.json</code> を出力</div><span class="a">→</span>
+  <div class="n fe">③ frontend: 仕様書から TypeScript の型を自動生成</div><span class="a">→</span>
+  <div class="n fe">④ 型エラーで、直す画面が分かる</div>
+</div>
+
+<h3>コマンド（API を変更したとき）</h3>
+<pre><code># backend: 仕様書を出力する
+cd backend && uv run python scripts/export_openapi.py
+
+# frontend: その仕様書から型を生成する
+cd frontend && pnpm gen:api</code></pre>
+
+<ul>
+  <li>生成された型のファイル（<code>frontend/src/lib/api/generated/</code>）は手で編集しない。</li>
+  <li>各 API に <code>operation_id</code> を付けて、生成される関数名を安定させる。決め方は、すべてのルートに <code>operation_id</code> を明示し、TypeScript 側から見た camelCase にする（<code>listPublicArticles</code>、<code>publishArticle</code>）。基準は <code>specs/001-docs-studio/contracts/openapi.yaml</code> の名前。</li>
+  <li><code>scripts/export_openapi.py</code> はアプリを組み立てるだけで、DB は要らない。<code>make check-api</code> が <code>openapi.json</code> と型を作り直し、差分があれば失敗する。<code>make test</code> がこれを実行し、<code>pnpm gen:api</code> は <code>make setup</code> に含める。</li>
+</ul>
+
+<!-- 7 -->
+<h2 id="db">7. DB 構造（PostgreSQL）</h2>
+<p class="cap">本番は Cloud SQL for PostgreSQL、ローカルは Docker Compose で起動する PostgreSQL 17（<code>db</code> と <code>db-test</code> のサービス）か、Auth Proxy 経由の Cloud SQL を使います。DB は<b>別々</b>にします: 本番、開発用の <code>&lt;name&gt;_dev</code>、テスト用の <code>&lt;name&gt;_test</code>。DDL は <code>backend/db-automation-apply/</code> に保存します。</p>
+<p>核心は、<b>下書きと公開内容を同じ行に混ぜない</b>ことです。下書きは <code>articles</code> の <code>draft_*</code> 列に、公開内容は不変の <code>article_versions</code> に置きます。</p>
+
+<div class="fig">
+<h3 style="margin:0 0 6px">データの分離: 下書きと公開内容は、同じ行に置かない</h3>
+<svg viewBox="0 0 960 300" role="img" aria-label="データの分離: 下書きと公開内容は、同じ行に置かない">
+  <defs><marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect class="b-n" x="20" y="105" width="120" height="60" rx="10"/>
+  <text class="t" x="80" y="132" text-anchor="middle">ライター</text><text class="s m" x="80" y="150" text-anchor="middle">編集、Restore</text>
+  <rect class="b-n" x="190" y="30" width="270" height="230" rx="12"/>
+  <text class="t" x="325" y="52" text-anchor="middle">articles</text>
+  <rect class="b-fe" x="206" y="66" width="238" height="70" rx="8"/>
+  <text class="t" x="325" y="94" text-anchor="middle">draft_*（編集できる）</text><text class="s m" x="325" y="114" text-anchor="middle">title, body, tags, draft_version</text>
+  <rect class="b-db" x="206" y="150" width="238" height="96" rx="8"/>
+  <text class="t" x="325" y="176" text-anchor="middle">公開の状態</text><text class="s" x="325" y="198" text-anchor="middle">status, published_at</text><text class="s" x="325" y="220" text-anchor="middle">current_published_version_id</text>
+  <rect class="b-n" x="570" y="30" width="200" height="230" rx="12"/>
+  <text class="t" x="670" y="52" text-anchor="middle">article_versions</text><text class="s m" x="670" y="68" text-anchor="middle">（不変のスナップショット）</text>
+  <rect class="b-be" x="590" y="80" width="160" height="40" rx="8"/><text class="s" x="670" y="105" text-anchor="middle">v1</text>
+  <rect class="b-be" x="590" y="130" width="160" height="40" rx="8"/><text class="s" x="670" y="155" text-anchor="middle">v2</text>
+  <rect class="b-fe" x="590" y="180" width="160" height="60" rx="8" style="stroke-width:3"/><text class="t" x="670" y="215" text-anchor="middle">v3  公開中</text>
+  <rect class="b-n" x="830" y="105" width="110" height="60" rx="10"/>
+  <text class="t" x="885" y="132" text-anchor="middle">公開側の読者</text>
+  <path class="ln" marker-end="url(#arA)" d="M140 135 H206"/>
+  <path class="ln" marker-end="url(#arA)" d="M444 100 H520 V200 H590"/>
+  <text class="s m" x="500" y="88" text-anchor="middle">Publish が</text><text class="s m" x="500" y="74" text-anchor="middle" style="display:none"></text>
+  <text class="s m" x="478" y="250" text-anchor="start" style="display:none"></text>
+  <path class="ln d" marker-end="url(#arA)" d="M444 226 H590"/>
+  <text class="s m" x="515" y="244" text-anchor="middle">pointer</text>
+  <path class="ln" marker-end="url(#arA)" d="M830 135 H800 V210 H750"/>
+  <text class="s m" x="885" y="190" text-anchor="middle">公開中の</text><text class="s m" x="885" y="206" text-anchor="middle">スナップショットだけ（1つの JOIN）</text>
+  <text class="s" x="480" y="288" text-anchor="middle">公開側は <tspan font-weight="700">draft_*</tspan> を読みません。下書きを編集しても、読者に見える内容は変わりません。</text>
+</svg>
+<div class="cap">下書きは <code>articles.draft_*</code> にあり、Publish がそれを <code>article_versions</code> の新しい不変の行にコピーして、参照を動かします。読者は参照をたどるだけです。</div>
+</div>
+
+<div class="fig">
+<svg viewBox="0 0 960 500" role="img" aria-label="ER図">
+  <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+
+  <!-- articles -->
+  <rect class="b-db" x="20" y="20" width="400" height="30" rx="8"/>
+  <text class="t" x="220" y="41" text-anchor="middle">articles（記事 = 下書き + 公開状態）</text>
+  <rect class="b-n" x="20" y="50" width="400" height="390"/>
+  <g class="s">
+    <text x="32" y="72"><tspan font-weight="700">PK</tspan>  id  BIGINT</text>
+    <text x="32" y="102">UQ  slug  TEXT</text>
+    <text x="32" y="132">     status  TEXT  <tspan class="m">draft / published / unpublished</tspan></text>
+    <text x="32" y="162">     draft_title  TEXT</text>
+    <text x="32" y="192">     draft_body  TEXT</text>
+    <text x="32" y="222">     draft_tags  TEXT[]</text>
+    <text x="32" y="252">     draft_version  INT  <tspan class="m">← 楽観的排他制御</tspan></text>
+    <text x="32" y="282">     last_version_number  INT  <tspan class="m">← 採番カウンタ（再利用しない）</tspan></text>
+    <text x="32" y="312"><tspan font-weight="700">FK</tspan>  current_published_version_id  BIGINT NULL</text>
+    <text x="32" y="342">     published_at  TIMESTAMPTZ NULL  <tspan class="m">← 初回公開日時</tspan></text>
+    <text x="32" y="372">     created_at  TIMESTAMPTZ</text>
+    <text x="32" y="402">     updated_at  TIMESTAMPTZ</text>
+  </g>
+  <rect x="20" y="296" width="400" height="56" fill="none" stroke="var(--db)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+  <!-- article_versions -->
+  <rect class="b-be" x="560" y="20" width="380" height="30" rx="8"/>
+  <text class="t" x="750" y="41" text-anchor="middle">article_versions（公開スナップショット・不変）</text>
+  <rect class="b-n" x="560" y="50" width="380" height="270"/>
+  <g class="s">
+    <text x="572" y="72"><tspan font-weight="700">PK</tspan>  id  BIGINT</text>
+    <text x="572" y="102"><tspan font-weight="700">FK</tspan>  article_id  BIGINT  → articles.id</text>
+    <text x="572" y="132">UQ  version_number  INT  <tspan class="m">(article_id と組で一意)</tspan></text>
+    <text x="572" y="162">     title  TEXT</text>
+    <text x="572" y="192">     body  TEXT</text>
+    <text x="572" y="222">     tags  TEXT[]</text>
+    <text x="572" y="252">     created_at  TIMESTAMPTZ</text>
+    <text x="572" y="290" class="m">UPDATE は禁止（トリガーで拒否）</text>
+  </g>
+
+  <!-- relations -->
+  <path class="ln" marker-end="url(#ar3)" d="M560 97 H490 V97 H420"/>
+  <path class="ln" d="M560 97 H420" />
+  <text class="s" x="490" y="86" text-anchor="middle">1 : N</text>
+  <text class="s m" x="490" y="116" text-anchor="middle">全バージョン</text>
+
+  <path class="ln d" marker-end="url(#ar3)" d="M420 309 H500 V225 H560"/>
+  <text class="s" x="500" y="330" text-anchor="middle">N : 0..1</text>
+  <text class="s m" x="500" y="348" text-anchor="middle">いま公開中の版</text>
+
+  <rect class="b-w" x="20" y="455" width="920" height="36" rx="8"/>
+  <text class="s" x="34" y="478">2本の線: 実線 = 履歴すべて（article_id）/ 破線 = 現在公開中の1版（current_published_version_id）。公開停止後も破線の参照は残す。</text>
+</svg>
+<div class="cap">破線の枠は「公開状態」を表す列。<code>draft_*</code> は編集のたびに変わり、<code>article_versions</code> は Publish のときに行が増えるだけです。</div>
+</div>
+
+<h3>DDL（正: <code>backend/db-automation-apply/001_schema.sql</code>）</h3>
+<pre><code>-- 001_schema.sql
+-- Schema for Docs Studio (PostgreSQL). Apply the files in this folder in numeric order.
+-- Source of truth for the data model; docs/nextjs-fastapi-architecture.html (section 7) mirrors it.
+
+-- ---------------------------------------------------------------------------
+-- articles: the draft and the publication state of one article
+-- ---------------------------------------------------------------------------
+CREATE TABLE articles (
+  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  slug          TEXT        NOT NULL UNIQUE
+                CHECK (char_length(slug) BETWEEN 1 AND 100
+                       AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  status        TEXT        NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published', 'unpublished')),
+
+  -- Draft content (editable). Never shown to the public side.
+  draft_title   TEXT        NOT NULL
+                CHECK (char_length(btrim(draft_title)) BETWEEN 1 AND 200),
+  draft_body    TEXT        NOT NULL DEFAULT ''
+                CHECK (char_length(draft_body) &lt;= 100000),
+  draft_tags    TEXT[]      NOT NULL DEFAULT '{}'
+                CHECK (cardinality(draft_tags) &lt;= 10),
+
+  -- Optimistic concurrency: bumped by an edit, a Restore, and a Publish that creates a snapshot.
+  draft_version INTEGER     NOT NULL DEFAULT 1 CHECK (draft_version &gt;= 1),
+
+  -- Per-article counter used to number snapshots. It never goes down, so numbers are never reused.
+  last_version_number INTEGER NOT NULL DEFAULT 0 CHECK (last_version_number &gt;= 0),
+
+  -- Publication state
+  current_published_version_id BIGINT,           -- the protected (live) version; kept after Unpublish
+  published_at  TIMESTAMPTZ,                      -- first publication time; never changes once set
+
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+
+  -- A never-published article has no pointer and no published_at; every other state has both.
+  CONSTRAINT articles_publish_consistency CHECK (
+    (status = 'draft'
+       AND current_published_version_id IS NULL AND published_at IS NULL)
+    OR
+    (status IN ('published', 'unpublished')
+       AND current_published_version_id IS NOT NULL AND published_at IS NOT NULL)
+  )
+);
+
+-- ---------------------------------------------------------------------------
+-- article_versions: immutable published snapshots
+-- ---------------------------------------------------------------------------
+CREATE TABLE article_versions (
+  id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  article_id     BIGINT      NOT NULL REFERENCES articles (id) ON DELETE RESTRICT,
+  version_number INTEGER     NOT NULL CHECK (version_number &gt; 0),
+  title          TEXT        NOT NULL,
+  body           TEXT        NOT NULL,
+  tags           TEXT[]      NOT NULL DEFAULT '{}' CHECK (cardinality(tags) &lt;= 10),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (article_id, version_number),
+  UNIQUE (article_id, id)              -- target of the composite foreign key below
+);
+
+-- An article can only point at one of its own versions, and a referenced version cannot be deleted.
+-- With a NULL pointer (never published) the foreign key is not checked (MATCH SIMPLE).
+ALTER TABLE articles
+  ADD CONSTRAINT articles_current_version_fk
+  FOREIGN KEY (id, current_published_version_id)
+  REFERENCES article_versions (article_id, id) ON DELETE RESTRICT;
+
+-- ---------------------------------------------------------------------------
+-- Guards
+-- ---------------------------------------------------------------------------
+
+-- Snapshots are immutable: reject every UPDATE (DELETE stays allowed; the foreign key protects the live one).
+CREATE FUNCTION forbid_version_update() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  RAISE EXCEPTION 'article_versions is immutable';
+END $$;
+
+CREATE TRIGGER article_versions_immutable
+  BEFORE UPDATE ON article_versions
+  FOR EACH ROW EXECUTE FUNCTION forbid_version_update();
+
+-- TRUNCATE bypasses row triggers, so guard it separately.
+-- The only exception is the test suite, which resets the data between tests inside a transaction
+-- that first runs: SET LOCAL docs.allow_reset = 'on'. The application never sets it, and the
+-- application role has no TRUNCATE privilege.
+CREATE FUNCTION forbid_version_truncate() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  IF current_setting('docs.allow_reset', true) = 'on' THEN
+    RETURN NULL;
+  END IF;
+  RAISE EXCEPTION 'article_versions cannot be truncated';
+END $$;
+
+CREATE TRIGGER article_versions_no_truncate
+  BEFORE TRUNCATE ON article_versions
+  FOR EACH STATEMENT EXECUTE FUNCTION forbid_version_truncate();
+
+-- Once published, an article never goes back to "never published", keeps its published_at,
+-- and its pointer only moves forward. The slug never changes. updated_at is maintained here.
+CREATE FUNCTION articles_guard() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF NEW.slug IS DISTINCT FROM OLD.slug THEN
+    RAISE EXCEPTION 'slug cannot be changed';
+  END IF;
+
+  IF OLD.current_published_version_id IS NOT NULL THEN
+    IF NEW.current_published_version_id IS NULL OR NEW.status = 'draft' THEN
+      RAISE EXCEPTION 'a published article cannot return to draft';
+    END IF;
+    IF NEW.published_at IS DISTINCT FROM OLD.published_at THEN
+      RAISE EXCEPTION 'published_at cannot change once set';
+    END IF;
+    IF NEW.current_published_version_id IS DISTINCT FROM OLD.current_published_version_id
+       AND (SELECT version_number FROM article_versions WHERE id = NEW.current_published_version_id)
+        &lt;= (SELECT version_number FROM article_versions WHERE id = OLD.current_published_version_id) THEN
+      RAISE EXCEPTION 'the live version can only move forward';
+    END IF;
+  END IF;
+
+  NEW.updated_at := clock_timestamp();
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER articles_guard_trg
+  BEFORE UPDATE ON articles
+  FOR EACH ROW EXECUTE FUNCTION articles_guard();
+
+-- ---------------------------------------------------------------------------
+-- Indexes
+-- (article_versions needs no extra index: UNIQUE (article_id, version_number) already serves it)
+-- ---------------------------------------------------------------------------
+CREATE INDEX articles_public_idx
+  ON articles (published_at DESC, id DESC) WHERE status = 'published';
+CREATE INDEX articles_writer_list_idx
+  ON articles (updated_at DESC, id DESC);
+
+-- ---------------------------------------------------------------------------
+-- Privileges (adjust the role names to your environment; run as the owner / migration role)
+-- ---------------------------------------------------------------------------
+-- REVOKE UPDATE, TRUNCATE ON article_versions FROM app_role;
+-- GRANT SELECT, INSERT, DELETE ON article_versions TO app_role;
+-- GRANT SELECT, INSERT, UPDATE ON articles TO app_role;
+</code></pre>
+
+<h3>制約が守る不変条件</h3>
+<p class="cap">原子性を保証するのは<b>トランザクション</b>です。下の制約は、バグや手作業があっても、おかしな状態が保存されないようにするためのものです。</p>
+<div class="scroll"><table>
+<tr><th>不変条件</th><th>アプリ（Service）</th><th>DB の最後の砦</th></tr>
+<tr><td>公開済みスナップショットは変更不可</td><td>更新用の API / メソッドを作らない</td><td><code>article_versions</code> の UPDATE トリガーと TRUNCATE トリガー。アプリ用ロールから <code>UPDATE, TRUNCATE</code> を <code>REVOKE</code></td></tr>
+<tr><td>Publish は原子的</td><td>1トランザクション、行ロック（<code>FOR UPDATE</code>）、文の実行時刻</td><td><code>articles_publish_consistency</code> の CHECK と複合 FK: 宙に浮いた参照や、状態の不一致を作らない</td></tr>
+<tr><td>「未公開」には戻らず、参照は前にしか進まない</td><td>Publish は大きい番号を作って、それを指す</td><td><code>articles_guard</code> トリガー: 参照と <code>published_at</code> を消せず、参照を戻せず、slug を変えられない</td></tr>
+<tr><td>保護された版は削除不可</td><td>削除は行ロックを取り、参照を確認して 409 <code>version_is_live</code></td><td>複合 FK の <code>ON DELETE RESTRICT</code>（SQLSTATE 23503 は同じ 409 に変換）</td></tr>
+<tr><td>Restore は履歴を壊さない</td><td><code>draft_*</code> と <code>draft_version</code> を1回の UPDATE で更新。版と公開状態には触れない</td><td>（<code>article_versions</code> の全行が不変であることを、テストで確認）</td></tr>
+<tr><td>同時編集の検知</td><td>編集と Restore は <code>WHERE draft_version = :expected</code>。Publish はロックの下で同じ比較</td><td>—</td></tr>
+<tr><td>公開停止後も履歴を保持</td><td>Unpublish は <code>status</code> だけを更新</td><td>CHECK と <code>articles_guard</code> が、参照と <code>published_at</code> を保つ</td></tr>
+<tr><td>version_number の重複・再利用なし</td><td>行ロックの下で <code>last_version_number</code> を増やす</td><td><code>UNIQUE (article_id, version_number)</code>。カウンタ列は減らない</td></tr>
+</table></div>
+<div class="ok">アプリで守り、DB でも守る二重構造にしておくと、バグや手動操作があっても不整合なデータが残りません。Alembic の自動生成は、循環する FK、トリガー、CHECK を正しく作れないので、DDL は <code>db-automation-apply/</code> に手で書きます。</div>
+
+<!-- 8 -->
+<h2 id="state">8. 記事の状態遷移</h2>
+<div class="fig">
+<h3 style="margin:0 0 6px">1つの記事の流れ: 各操作で何が変わるか</h3>
+<svg viewBox="0 0 960 330" role="img" aria-label="1つの記事の流れ: 各操作で何が変わるか">
+  <line x1="120" y1="52" x2="120" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="120" y="42" text-anchor="middle">作成</text><line x1="215" y1="52" x2="215" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="215" y="42" text-anchor="middle">編集</text><line x1="310" y1="52" x2="310" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="310" y="42" text-anchor="middle">Publish</text><line x1="405" y1="52" x2="405" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="405" y="42" text-anchor="middle">編集</text><line x1="500" y1="52" x2="500" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="500" y="42" text-anchor="middle">Publish</text><line x1="595" y1="52" x2="595" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="595" y="42" text-anchor="middle">Unpublish</text><line x1="690" y1="52" x2="690" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="690" y="42" text-anchor="middle">編集</text><line x1="785" y1="52" x2="785" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="785" y="42" text-anchor="middle">v1 を Restore</text><line x1="880" y1="52" x2="880" y2="250" stroke="var(--border)" stroke-dasharray="3 4"/><text class="s" x="880" y="42" text-anchor="middle">Publish</text>
+  <text class="s m" x="10" y="92">状態</text>
+  <rect class="b-n" x="120" y="72" width="190" height="34"/><text class="s" x="215" y="94" text-anchor="middle">未公開</text>
+  <rect class="b-fe" x="310" y="72" width="285" height="34"/><text class="s" x="452" y="94" text-anchor="middle">公開中</text>
+  <rect class="b-w" x="595" y="72" width="285" height="34"/><text class="s" x="737" y="94" text-anchor="middle">公開停止</text>
+  <rect class="b-fe" x="880" y="72" width="70" height="34"/><text class="s" x="915" y="94" text-anchor="middle">公開中</text>
+  <text class="s m" x="10" y="140">公開中の参照</text>
+  <rect class="b-n" x="120" y="120" width="190" height="34"/><text class="s m" x="215" y="142" text-anchor="middle">なし</text>
+  <rect class="b-db" x="310" y="120" width="190" height="34"/><text class="s" x="405" y="142" text-anchor="middle">v1</text>
+  <rect class="b-db" x="500" y="120" width="380" height="34"/><text class="s" x="690" y="142" text-anchor="middle">v2（公開停止後も保持）</text>
+  <rect class="b-db" x="880" y="120" width="70" height="34"/><text class="s" x="915" y="142" text-anchor="middle">v3</text>
+  <text class="s m" x="10" y="188">draft_version</text>
+  <text class="t" x="120" y="184" text-anchor="middle">1</text><text class="t" x="215" y="184" text-anchor="middle">2</text><text class="t" x="310" y="184" text-anchor="middle">3</text><text class="t" x="405" y="184" text-anchor="middle">4</text><text class="t" x="500" y="184" text-anchor="middle">5</text><text class="t" x="595" y="184" text-anchor="middle">5</text><text class="t" x="690" y="184" text-anchor="middle">6</text><text class="t" x="785" y="184" text-anchor="middle">7</text><text class="t" x="880" y="184" text-anchor="middle">8</text>
+  <text class="s m" x="10" y="236">スナップショット</text>
+  <rect class="b-be" x="288" y="218" width="44" height="26" rx="6"/><text class="s" x="310" y="236" text-anchor="middle">v1</text>
+  <rect class="b-be" x="478" y="218" width="44" height="26" rx="6"/><text class="s" x="500" y="236" text-anchor="middle">v2</text>
+  <rect class="b-be" x="858" y="218" width="44" height="26" rx="6"/><text class="s" x="880" y="236" text-anchor="middle">v3</text>
+  <text class="s" x="480" y="282" text-anchor="middle">スナップショットが増えるのは、内容が変わる Publish のときだけで、その後は変更されません。</text>
+  <text class="s" x="480" y="304" text-anchor="middle">Unpublish は参照と published_at を保ち、Restore は下書きだけを変えます。</text>
+</svg>
+<div class="cap">左から右へ読みます。状態と参照が変わるのは Publish と Unpublish のときだけで、編集と Restore は下書き（と <code>draft_version</code>）だけを変えます。</div>
+</div>
+
+<div class="fig">
+<svg viewBox="0 0 960 330" role="img" aria-label="状態遷移図">
+  <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect class="b-n" x="30" y="110" width="170" height="70" rx="35"/>
+  <text class="t" x="115" y="141" text-anchor="middle">draft</text><text class="s m" x="115" y="161" text-anchor="middle">一度も公開していない</text>
+  <rect class="b-be" x="395" y="110" width="170" height="70" rx="35"/>
+  <text class="t" x="480" y="141" text-anchor="middle">published</text><text class="s m" x="480" y="161" text-anchor="middle">公開中</text>
+  <rect class="b-w" x="760" y="110" width="170" height="70" rx="35"/>
+  <text class="t" x="845" y="141" text-anchor="middle">unpublished</text><text class="s m" x="845" y="161" text-anchor="middle">公開停止中（履歴は保持）</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M200 135 H395"/>
+  <text class="s" x="297" y="122" text-anchor="middle">Publish（初回）</text><text class="s m" x="297" y="156" text-anchor="middle">v1 作成 + published_at 設定</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M565 135 H760"/>
+  <text class="s" x="662" y="122" text-anchor="middle">Unpublish</text><text class="s m" x="662" y="156" text-anchor="middle">status だけ変更</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M845 180 V250 H530 Q480 250 480 185"/>
+  <text class="s" x="690" y="270" text-anchor="middle">Publish（再公開）</text><text class="s m" x="690" y="288" text-anchor="middle">新しい版（published_at は維持）。下書きが公開中と同じなら status を戻すだけ</text>
+
+  <path class="ln" marker-end="url(#ar4)" d="M440 110 C430 40 530 40 520 110"/>
+  <text class="s" x="480" y="40" text-anchor="middle">Publish（再公開）: 新版を作り、参照を差し替え</text>
+
+  <path class="ln d" d="M115 110 C100 60 130 60 115 110"/>
+  <text class="s m" x="115" y="70" text-anchor="middle">編集・Restore は</text><text class="s m" x="115" y="86" text-anchor="middle">状態を変えない</text>
+</svg>
+<div class="cap">編集と Restore は <code>draft_*</code> 列を変えるだけで、どの状態でも status と公開中の版は動きません。公開側から見えるのは <code>published</code> のときの「公開中スナップショット」だけです。</div>
+</div>
+
+<h3>操作の一覧: すべての操作が、すべての状態で何をするか</h3>
+<div class="scroll"><table>
+<tr><th>操作</th><th>元の状態</th><th>後の状態</th><th>公開中の参照</th><th>published_at</th><th>draft_version</th><th>スナップショット</th><th>結果</th></tr>
+<tr><td>作成</td><td>—</td><td>draft</td><td>なし</td><td>なし</td><td>1</td><td>なし</td><td>201</td></tr><tr><td>下書きの編集</td><td>どれでも</td><td>変わらない</td><td>変わらない</td><td>変わらない</td><td>+1</td><td>変わらない</td><td>200（古ければ 409）</td></tr><tr><td>Publish（初回）</td><td>draft</td><td>published</td><td>→ 新しい v1</td><td>1回だけ設定</td><td>+1</td><td>+1 新規</td><td>201</td></tr><tr><td>Publish（下書きが変わっている）</td><td>published / unpublished</td><td>published</td><td>→ 新しい版</td><td>保持</td><td>+1</td><td>+1 新規</td><td>201</td></tr><tr><td>Publish（下書きが公開中と同じ）</td><td>published</td><td>published</td><td>変わらない</td><td>保持</td><td>変わらない</td><td>なし</td><td>200</td></tr><tr><td>Publish（下書きが公開中と同じ）</td><td>unpublished</td><td>published</td><td>変わらない</td><td>保持</td><td>変わらない</td><td>なし</td><td>200</td></tr><tr><td>Unpublish</td><td>published</td><td>unpublished</td><td>保持</td><td>保持</td><td>変わらない</td><td>なし</td><td>200</td></tr><tr><td>Unpublish</td><td>draft / unpublished</td><td>—</td><td>—</td><td>—</td><td>—</td><td>なし</td><td>409 not_published</td></tr><tr><td>版 N の Restore</td><td>どれでも</td><td>変わらない</td><td>変わらない</td><td>変わらない</td><td>+1</td><td>なし（全行が同一）</td><td>200（404 / 409）</td></tr><tr><td>版の削除</td><td>どれでも</td><td>変わらない</td><td>変わらない</td><td>変わらない</td><td>変わらない</td><td>−1（参照が指さない版）</td><td>204</td></tr><tr><td>保護された版の削除</td><td>published / unpublished</td><td>—</td><td>—</td><td>—</td><td>—</td><td>なし</td><td>409 version_is_live</td></tr>
+</table></div>
+<p class="cap">1行を横に読むと、その操作の影響がすべて分かります。参照と <code>published_at</code> が変わるのは Publish だけで、Restore と編集は下書きだけに触れ、Unpublish と削除は公開中のスナップショットを決して消しません。</p>
+
+<!-- 9 -->
+<h2 id="publish">9. Publish と排他制御の要点</h2>
+<p>書き手の操作は、すべて<b>先に記事の行ロックを取る</b>（または1文の条件つき UPDATE にする）。判断は、すべてロックした行に対して行う。ロックの順序は常に「記事の行、次に版の行」なので、操作どうしがデッドロックしない。<code>READ COMMITTED</code> で足りる。<code>REPEATABLE READ</code> にすると、待ちがシリアライズ失敗に変わるので使わない。</p>
+<div class="fig">
+<h3 style="margin:0 0 6px">Publish: 判断の順序</h3>
+<svg viewBox="0 0 960 510" role="img" aria-label="Publish: 判断の順序">
+  <defs><marker id="arC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect class="b-fe" x="110" y="14" width="380" height="34" rx="8"/><text class="s" x="300.0" y="35.0" text-anchor="middle">POST /articles/{id}/publish  { expected_draft_version }</text><rect class="b-n" x="110" y="66" width="380" height="30" rx="8"/><text class="s" x="300.0" y="85.0" text-anchor="middle">BEGIN; 記事の行をロック（FOR UPDATE）</text><path class="b-n" d="M300.0 118 L450 146.0 L300.0 174 L150 146.0 Z"/><text class="s" x="300.0" y="150.0" text-anchor="middle">記事は存在する？</text><path class="b-n" d="M300.0 198 L450 226.0 L300.0 254 L150 226.0 Z"/><text class="s" x="300.0" y="230.0" text-anchor="middle">expected_draft_version = draft_version？</text><path class="b-n" d="M300.0 278 L450 306.0 L300.0 334 L150 306.0 Z"/><text class="s" x="300.0" y="310.0" text-anchor="middle">title と body は空でない？</text><path class="b-n" d="M300.0 358 L450 386.0 L300.0 414 L150 386.0 Z"/><text class="s" x="300.0" y="390.0" text-anchor="middle">下書き = 公開中の版？</text><rect class="b-fe" x="110" y="448" width="380" height="46" rx="8"/><text class="s" x="300.0" y="467.0" text-anchor="middle">カウンタ +1 → 版を INSERT →</text><text class="s" x="300.0" y="483.0" text-anchor="middle">status・参照・published_at を UPDATE、draft_version +1 → COMMIT → 201</text><path class="ln" marker-end="url(#arC)" d="M300 48 V66"/><path class="ln" marker-end="url(#arC)" d="M300 96 V118"/><path class="ln" marker-end="url(#arC)" d="M300 174 V198"/><path class="ln" marker-end="url(#arC)" d="M300 254 V278"/><path class="ln" marker-end="url(#arC)" d="M300 334 V358"/><path class="ln" marker-end="url(#arC)" d="M300 414 V448"/><path class="ln" marker-end="url(#arC)" d="M450 146 H600"/><text class="s m" x="475" y="140">いいえ</text><rect class="b-w" x="600" y="128" width="330" height="36" rx="8"/><text class="s" x="765.0" y="150.0" text-anchor="middle">404 not found</text><path class="ln" marker-end="url(#arC)" d="M450 226 H600"/><text class="s m" x="475" y="220">いいえ</text><rect class="b-w" x="600" y="208" width="330" height="36" rx="8"/><text class="s" x="765.0" y="230.0" text-anchor="middle">409 version_conflict（何も変えない）</text><path class="ln" marker-end="url(#arC)" d="M450 306 H600"/><text class="s m" x="475" y="300">いいえ</text><rect class="b-w" x="600" y="288" width="330" height="36" rx="8"/><text class="s" x="765.0" y="310.0" text-anchor="middle">422 empty_content</text><path class="ln" marker-end="url(#arC)" d="M450 386 H600"/><text class="s m" x="475" y="380">はい</text><rect class="b-be" x="600" y="360" width="330" height="52" rx="8"/><text class="s" x="765.0" y="382.0" text-anchor="middle">200: 新しい版は作らない</text><text class="s" x="765.0" y="398.0" text-anchor="middle">（unpublished なら status を published に戻す）</text><text class="s m" x="308" y="190">はい</text><text class="s m" x="308" y="270">はい</text><text class="s m" x="308" y="350">はい</text><text class="s m" x="308" y="430">いいえ</text>
+</svg>
+<div class="cap">判断はすべてロックの後に、ロックした行に対して行います。最後の手順より前で失敗すれば、DB は何も変わりません。</div>
+</div>
+
+<div class="grid2">
+<div class="card">
+<h3 style="margin-top:0">Publish（1トランザクション）</h3>
+<pre><code>BEGIN;
+SET LOCAL lock_timeout = '3s';
+SELECT a.*, v.title AS live_title,
+       v.body AS live_body, v.tags AS live_tags
+FROM articles a
+LEFT JOIN article_versions v
+  ON v.article_id = a.id
+ AND v.id = a.current_published_version_id
+WHERE a.id = :id
+FOR UPDATE OF a;                    -- 0 行: 404
+
+-- 判断はロックの「後」に行う。先に読んだ値は使わない
+--  a.draft_version &lt;&gt; :expected  -> 409 version_conflict
+--  title か body が空            -> 422 empty_content
+--  下書き IS NOT DISTINCT FROM 公開中 (title, body, tags)
+--    -> unpublished: status を 'published' に戻す
+--       それ以外: 何も書かない        => 200
+
+UPDATE articles
+   SET last_version_number = last_version_number + 1
+ WHERE id = :id
+RETURNING last_version_number;      -- :n
+
+INSERT INTO article_versions
+  (article_id, version_number, title, body, tags)
+SELECT id, :n, draft_title, draft_body, draft_tags
+  FROM articles WHERE id = :id
+RETURNING id;                       -- :vid
+
+UPDATE articles SET
+  status = 'published',
+  current_published_version_id = :vid,
+  published_at = COALESCE(published_at, clock_timestamp()),
+  draft_version = draft_version + 1
+WHERE id = :id;
+COMMIT;                             -- 201</code></pre>
+<p class="cap">ロックの下での行ごとの比較は正確で、ハッシュ列は要らない。比較の相手は<b>公開中</b>のスナップショットだけなので、古い版と同じ内容の下書きでも、新しい版を作る。<code>updated_at</code> は <code>articles_guard</code> トリガーが設定する。</p>
+</div>
+<div class="card">
+<h3 style="margin-top:0">楽観的排他制御（下書き編集）</h3>
+<pre><code>UPDATE articles SET
+  draft_title = :t, draft_body = :b, draft_tags = :g,
+  draft_version = draft_version + 1
+WHERE id = :id
+  AND draft_version = :expected     -- 読んだ時の版
+RETURNING draft_version;
+-- 0 行: SELECT draft_version FROM articles WHERE id = :id
+--   行なし -> 404
+--   あり   -> 409 version_conflict
+--             details.current_draft_version = その値</code></pre>
+<div class="flow">
+  <div class="n">A: v5 を読む</div><div class="n">B: v5 を読む</div><div class="n be">A: 保存 → v6</div><div class="n" style="border-color:var(--warn);background:var(--warn-bg)">B: 保存(v5) → 409</div>
+</div>
+<p class="cap">409 に現在の <code>draft_version</code> を載せ、画面で再読み込みか再送を選ばせる（FR-16）。<code>READ COMMITTED</code> では、B の UPDATE は A を待ち、新しい行に対して WHERE を再評価し、何も更新しない。</p>
+
+<h3>Restore（1文）</h3>
+<pre><code>UPDATE articles SET
+  draft_title = v.title, draft_body = v.body,
+  draft_tags = v.tags,
+  draft_version = draft_version + 1
+FROM article_versions v
+WHERE articles.id = :id
+  AND v.article_id = :id AND v.version_number = :n
+  AND articles.draft_version = :expected
+RETURNING articles.draft_version;
+-- 0 行: 記事か版がなければ 404、それ以外は 409</code></pre>
+<p class="cap">版の行には触れず、記事がどの状態でも <code>status</code>、参照、<code>published_at</code> も変えない。</p>
+</div>
+</div>
+<div class="grid2">
+<div class="card">
+<h3 style="margin-top:0">Unpublish</h3>
+<pre><code>SELECT status FROM articles
+ WHERE id = :id FOR UPDATE;         -- なければ 404
+-- status &lt;&gt; 'published'  -> 409 not_published
+UPDATE articles SET status = 'unpublished'
+ WHERE id = :id;                    -- 参照と published_at は保つ</code></pre>
+</div>
+<div class="card">
+<h3 style="margin-top:0">版の削除</h3>
+<pre><code>SELECT current_published_version_id
+  FROM articles WHERE id = :id FOR UPDATE;
+-- 版の番号がない               -> 404
+-- 参照が指す版                 -> 409 version_is_live
+DELETE FROM article_versions
+ WHERE article_id = :id
+   AND version_number = :n;         -- 204
+-- SQLSTATE 23503（FK）-> 同じ 409</code></pre>
+</div>
+</div>
+<div class="fig">
+<h3 style="margin:0 0 6px">同時に来た2つの Publish（同じ expected_draft_version）</h3>
+<svg viewBox="0 0 960 300" role="img" aria-label="同時に来た2つの Publish（同じ expected_draft_version）">
+  <text class="s m" x="10" y="72">リクエスト A</text>
+  <rect class="b-fe" x="130" y="52" width="150" height="34" rx="6"/><text class="s" x="205" y="74" text-anchor="middle">BEGIN + ロック</text>
+  <rect class="b-fe" x="280" y="52" width="230" height="34" rx="6"/><text class="s" x="395" y="74" text-anchor="middle">確認、版を INSERT、UPDATE</text>
+  <rect class="b-fe" x="510" y="52" width="80" height="34" rx="6"/><text class="s" x="550" y="74" text-anchor="middle">COMMIT</text>
+  <text class="t" x="640" y="74" fill="var(--fe)">201 新しい版</text>
+  <text class="s m" x="10" y="142">リクエスト B</text>
+  <rect class="b-n" x="190" y="122" width="70" height="34" rx="6"/><text class="s" x="225" y="144" text-anchor="middle">BEGIN</text>
+  <rect class="b-w" x="260" y="122" width="330" height="34" rx="6" style="stroke-dasharray:5 3"/><text class="s" x="425" y="144" text-anchor="middle">行ロックを待つ</text>
+  <rect class="b-be" x="590" y="122" width="60" height="34" rx="6"/><text class="s" x="620" y="144" text-anchor="middle">ロック</text>
+  <rect class="b-w" x="650" y="122" width="110" height="34" rx="6"/><text class="s" x="705" y="144" text-anchor="middle">古い → 409</text>
+  <text class="t" x="780" y="144" fill="var(--warn)">409 version_conflict</text>
+  <text class="s m" x="10" y="212">記事の行</text>
+  <rect class="b-db" x="130" y="192" width="460" height="34" rx="6"/><text class="s" x="360" y="214" text-anchor="middle">A がロック</text>
+  <rect class="b-db" x="590" y="192" width="170" height="34" rx="6"/><text class="s" x="675" y="214" text-anchor="middle">B がロック</text>
+  <line x1="590" y1="46" x2="590" y2="232" stroke="var(--muted)" stroke-dasharray="3 4"/>
+  <text class="s" x="480" y="272" text-anchor="middle">勝つのはちょうど1つです。もう1つは待たされ、新しい draft_version を見て拒否されます。5xx は出ず、version_number は連続します。</text>
+</svg>
+</div>
+
+<h3>実装上の注意（async SQLAlchemy）</h3>
+<ul>
+  <li>リクエストごとに1つのセッションと1つの <code>async with session.begin()</code> を Service が持つ。<code>expire_on_commit=False</code>。</li>
+  <li>ロックする読み取りは <code>with_for_update(of=Article).execution_options(populate_existing=True)</code> を使う。そうしないと、identity map に残った古いオブジェクトがロックを無効にする。同時実行の経路では、Core の <code>UPDATE … RETURNING</code> を優先する。</li>
+  <li><code>SET LOCAL lock_timeout</code> と <code>statement_timeout</code> を設定し、ロックのタイムアウトは 503 にする。slug の SQLSTATE 23505 は採番をやり直し（13 節 U15）、23503 は 409 <code>version_is_live</code> に変換して、500 にはしない。</li>
+  <li>プール: <code>pool_size=3</code>、<code>max_overflow=2</code>、<code>pool_pre_ping=True</code>、<code>pool_recycle=1800</code>。Cloud Run のインスタンスが 3 つでも、小さな Cloud SQL の <code>max_connections</code> に収まる。起動時は遅延して接続し、DB が一瞬つながらなくてもコンテナが落ちないようにする。</li>
+  <li>時刻は <code>clock_timestamp()</code>（文の実行時刻）を使う。ロック待ちをしたリクエストが、前の版より早い時刻にならない。セッションのタイムゾーンは UTC。</li>
+</ul>
+
+<!-- 10 -->
+<h2 id="api">10. API 一覧（案）</h2>
+<p>パスはすべて <code>/api/v1</code> 配下。<b>書き手のエンドポイントは Basic 認証必須</b>（有効なとき。本番では常に）で、最初に確認する。認証情報がない、または違えば、404 や 422 より先に 401 になる。公開側（<code>/public/*</code>）と <code>/healthz</code> は認証なし。確定版は <code>specs/001-docs-studio/plan.md</code> に従います。</p>
+<div class="scroll"><table>
+<tr><th>区分</th><th>メソッド / パス</th><th>用途</th><th>成功</th><th>主なエラー</th></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>POST /articles</code></td><td>記事の作成（<code>draft_version</code> は 1、status は <code>draft</code>、スナップショットなし）。slug が使われていれば末尾に番号を付け（U15）、実際の slug を返す</td><td>201 + <code>Location</code></td><td>409 <code>slug_conflict</code>（やり直しを使い切ったときだけ）、422</td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>GET /articles?status=&amp;limit=&amp;offset=</code></td><td>全記事の一覧（<code>updated_at</code> の新しい順、最大 100 件）</td><td>200</td><td>422（未知の status）</td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>GET /articles/{id}</code></td><td>詳細（下書きを含む）</td><td>200</td><td>404</td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>PATCH /articles/{id}</code></td><td>下書きの部分更新: 省いた項目は元のまま、<code>tags</code> は全体を置き換え、<code>expected_draft_version</code> 必須、slug は不可</td><td>200</td><td>404、409 <code>version_conflict</code>、422</td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>POST /articles/{id}/publish</code></td><td>公開（本文: <code>expected_draft_version</code>）</td><td>201 新しい版 / 200 下書きが同じ</td><td>404、409 <code>version_conflict</code>、422 <code>empty_content</code></td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>POST /articles/{id}/unpublish</code></td><td>公開停止（版の確認なし）</td><td>200</td><td>404、409 <code>not_published</code></td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>GET /articles/{id}/versions</code></td><td>履歴（新しい順）: id、<code>version_number</code>、title、<code>created_at</code>、<code>is_live</code>（本文なし）</td><td>200</td><td>404</td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>GET /articles/{id}/versions/{n}</code></td><td>特定バージョンの全内容</td><td>200</td><td>404</td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>POST /articles/{id}/versions/{n}/restore</code></td><td>その版を下書きにコピー（本文: <code>expected_draft_version</code>。公開はしない）</td><td>200</td><td>404、409 <code>version_conflict</code></td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>DELETE /articles/{id}/versions/{n}</code></td><td>バージョン削除（版の確認なし）</td><td>204</td><td>404、409 <code>version_is_live</code></td></tr>
+<tr><td><span class="tag be">書き手</span></td><td><code>POST /ai/draft</code> <em>（除外。余裕があれば、R15）</em></td><td>Claude API で、テーマから提案（title、body、tags）を生成する。何も書き込まない</td><td>200</td><td>422、503 <code>ai_unavailable</code>（前払いのクレジットを使い切ったときも）、504 <code>ai_timeout</code>。<code>AI_ENABLED</code> を設定しない限り、このルートは存在しない</td></tr>
+<tr><td><span class="tag fe">公開</span></td><td><code>GET /public/articles?limit=&amp;offset=</code></td><td>公開済み一覧: slug、title、tags、<code>published_at</code>、更新日（再公開済みのときだけ）。最大 100 件</td><td>200（空なら <code>[]</code>）</td><td>—</td></tr>
+<tr><td><span class="tag fe">公開</span></td><td><code>GET /public/articles/{slug}</code></td><td>公開中スナップショットの title、tags、本文（<b>1つの</b> JOIN で取得）</td><td>200</td><td>404（未公開・公開停止・存在しない・形式が不正な slug は、すべて同じ本文）</td></tr>
+<tr><td><span class="tag fe">公開</span></td><td><code>GET /healthz</code></td><td>生存確認。DB には触れない</td><td>200</td><td>—</td></tr>
+</table></div>
+<ul>
+  <li><b>publish、unpublish、restore を POST のサブリソースにしているのは意図的</b>です。これらは項目の更新ではなくコマンドなので、<code>status</code> を PATCH で公開しない。</li>
+  <li>版の確認はリクエスト本文の項目（<code>expected_draft_version</code>）で、<code>If-Match</code> / 412 ではない。これは検討したうえで U1 で決めた。</li>
+  <li>公開一覧は、公開中スナップショットから title、tags、日付だけを（<code>body</code> は取らずに）1つの JOIN で選ぶ。公開の詳細も1文で取るので、title と本文は必ず同じ版から来る。</li>
+  <li>公開 API は長いキャッシュ用の <code>Cache-Control</code> を付けず（キャッシュしない）、書き手のレスポンスには <code>no-store</code> を付ける。</li>
+</ul>
+
+<!-- 11 -->
+<h2 id="env">11. 環境・デプロイ（GCP Cloud Run + PostgreSQL）</h2>
+<p>フロントとバックは、それぞれ別の Cloud Run サービスにデプロイします。DB は Cloud SQL for PostgreSQL です。ローカルでは、新規チェックアウトから <code>docker compose up --build</code> で、PostgreSQL、スキーマ、API、Web アプリが起動します（必要なのは Docker だけ）。</p>
+
+<div class="fig">
+<svg viewBox="0 0 960 360" role="img" aria-label="Cloud Run 構成図">
+  <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <rect x="190" y="20" width="750" height="320" rx="14" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text class="s m" x="206" y="42">Google Cloud（リージョン: asia-northeast1）</text>
+
+  <rect class="b-n" x="20" y="140" width="130" height="70" rx="10"/>
+  <text class="t" x="85" y="170" text-anchor="middle">ブラウザ</text><text class="s m" x="85" y="190" text-anchor="middle">一般 / ライター</text>
+
+  <rect class="b-fe" x="225" y="100" width="210" height="150" rx="12"/>
+  <text class="t" x="330" y="125" text-anchor="middle">Cloud Run: web</text>
+  <text class="s m" x="330" y="145" text-anchor="middle">Next.js（docs-studio-web）</text>
+  <text class="s" x="330" y="175" text-anchor="middle">公開（/studio は Basic 認証）</text>
+  <text class="s" x="330" y="195" text-anchor="middle">env: API_BASE_URL</text>
+  <text class="s m" x="330" y="225" text-anchor="middle">cloudbuild.yaml（frontend）</text>
+
+  <rect class="b-be" x="500" y="100" width="210" height="150" rx="12"/>
+  <text class="t" x="605" y="125" text-anchor="middle">Cloud Run: api</text>
+  <text class="s m" x="605" y="145" text-anchor="middle">FastAPI（docs-studio-api）</text>
+  <text class="s" x="605" y="175" text-anchor="middle">公開（書き手の API は Basic 認証）</text>
+  <text class="s" x="605" y="195" text-anchor="middle">secrets: DATABASE_URL, BASIC_AUTH_*</text>
+  <text class="s m" x="605" y="225" text-anchor="middle">cloudbuild.yaml（backend）</text>
+
+  <rect class="b-be" x="500" y="270" width="210" height="52" rx="10" stroke-dasharray="5 3"/>
+  <text class="s" x="605" y="292" text-anchor="middle">Cloud Run Job: migrate</text><text class="s m" x="605" y="310" text-anchor="middle">alembic upgrade head（デプロイ時）</text>
+
+  <path d="M790 120 v-8 a8 8 0 0 1 8 -8 h110 a8 8 0 0 1 8 8 v8" class="b-db"/>
+  <rect class="b-db" x="790" y="118" width="126" height="90" rx="0"/>
+  <ellipse class="b-db" cx="853" cy="118" rx="63" ry="12"/>
+  <ellipse class="b-db" cx="853" cy="208" rx="63" ry="12"/>
+  <text class="t" x="853" y="158" text-anchor="middle">Cloud SQL</text>
+  <text class="s" x="853" y="178" text-anchor="middle">PostgreSQL</text>
+
+  <path class="ln" marker-end="url(#ar5)" marker-start="url(#ar5)" d="M150 175 H225"/>
+  <text class="s m" x="187" y="164" text-anchor="middle">HTTPS</text>
+  <path class="ln" marker-end="url(#ar5)" marker-start="url(#ar5)" d="M435 175 H500"/>
+  <text class="s m" x="467" y="165" text-anchor="middle">HTTPS</text>
+  <path class="ln" marker-end="url(#ar5)" marker-start="url(#ar5)" d="M710 163 H790"/>
+  <text class="s m" x="750" y="152" text-anchor="middle">Unix</text><text class="s m" x="750" y="188" text-anchor="middle">socket</text>
+  <path class="ln d" marker-end="url(#ar5)" d="M710 296 H853 V222"/>
+</svg>
+<div class="cap">Cloud Run はどちらも公開しますが、書き手側（<code>/studio</code> と書き手の API）は Basic 認証で守ります。</div>
+</div>
+
+<h3>設定ファイル（YAML）</h3>
+<div class="scroll"><table>
+<tr><th>ファイル</th><th>場所</th><th>役割</th></tr>
+<tr><td><code>compose.yaml</code></td><td>リポジトリのルート</td><td>ローカルでの実行用: 開発用（<code>db</code>）とテスト用（<code>db-test</code>）の PostgreSQL 17、それに Dockerfile からビルドする <code>migrate</code>、<code>backend</code>、<code>frontend</code>。<code>docker compose up --build</code> ですべてが動きます。短いセットアップコマンドの一部なので、優先度は低くありません</td></tr>
+<tr><td><code>cloudbuild.yaml</code></td><td>backend</td><td>イメージのビルド → Artifact Registry へ push → マイグレーション用 Job を実行 → Cloud Run（api）へデプロイ</td></tr>
+<tr><td><code>cloudbuild.yaml</code></td><td>frontend</td><td>イメージのビルド → push → Cloud Run（web）へデプロイ。<code>API_BASE_URL</code> を環境変数で渡す</td></tr>
+</table></div>
+<p class="cap">各プロジェクトの <code>Dockerfile</code> と <code>.dockerignore</code> もルートにあります（backend: python:3.12-slim + uv、frontend: node:22-slim の3段ビルド）。ローカルの実行では Docker Compose が同じ Dockerfile をビルドし、Cloud Run では Cloud Build がビルドします。どちらも非 root で動きます。まだビルドも実行もしていない（<code>pyproject.toml</code> や <code>package.json</code> が要る）ので、検証済みとは書きません。フロントの Dockerfile には、<code>next.config.ts</code> の <code>output: "standalone"</code> と、<code>COPY</code> を通すための <code>public/.gitkeep</code> も要ります。</p>
+
+<h3>デプロイの流れ</h3>
+<div class="flow">
+  <div class="n">gcloud builds submit</div><span class="a">→</span>
+  <div class="n be">イメージ build / push</div><span class="a">→</span>
+  <div class="n be">migrate Job 実行</div><span class="a">→</span>
+  <div class="n be">api をデプロイ</div><span class="a">→</span>
+  <div class="n fe">web をデプロイ</div>
+</div>
+<p>順序は <b>マイグレーション → api → web</b>。後方互換のある変更（追加 → 移行 → 削除）にしておけば、途中で止まっても動き続けます。</p>
+
+<h3>環境ごとの違い</h3>
+<div class="scroll"><table>
+<tr><th>項目</th><th>ローカル</th><th>Cloud Run</th></tr>
+<tr><td>PostgreSQL</td><td>Docker Compose の PostgreSQL 17（<code>db</code>、<code>db-test</code>）。または、Auth Proxy で <code>localhost</code> に中継した Cloud SQL</td><td>Cloud SQL for PostgreSQL（Unix ソケット）</td></tr>
+<tr><td><code>DATABASE_URL</code></td><td><code>postgresql+asyncpg://USER:PASS@localhost:5432/app</code>（Compose の DB。Cloud SQL はプロキシ経由）</td><td>Secret Manager の <code>database-url</code>。<code>...@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE</code></td></tr>
+<tr><td>DB 名</td><td>開発は <code>&lt;name&gt;_dev</code>。テストは <code>TEST_DATABASE_URL</code> 経由で <code>&lt;name&gt;_test</code></td><td>本番の DB（ローカルでは使わない）</td></tr>
+<tr><td>マイグレーション</td><td><code>uv run alembic upgrade head</code></td><td>Cloud Run Job（デプロイ時に自動実行）</td></tr>
+<tr><td>フロント → API</td><td><code>http://localhost:8000</code></td><td>API の Cloud Run URL（無認証）</td></tr>
+<tr><td>待ち受けポート</td><td>8000 / 3000</td><td>api = 8000、web = 3000（<code>--port</code> で指定）</td></tr>
+</table></div>
+
+<details class="opt"><summary>デプロイと運用の詳細（評価の対象外。クリックで開く）</summary>
+<h3>運用上の設定</h3>
+<div class="scroll"><table>
+<tr><th>項目</th><th>設定</th></tr>
+<tr><td>上限とコスト</td><td>両方のサービスに <code>--max-instances</code>（例: 3）。<code>--cpu-boost</code>。<code>--min-instances=0</code>（数秒のコールドスタートは許容）。常時かかる主なコストは Cloud SQL なので、使わない間は止め、評価の後で削除する。</td></tr>
+<tr><td>マイグレーション Job</td><td><code>--max-retries=0</code> とタスクのタイムアウト。マイグレーションはアドバイザリロック（<code>pg_advisory_lock</code>）の中で実行し、2つのビルドが同時に流さないようにする。追加だけの後方互換のあるマイグレーションだけを、それを使うコードと同じリリースに入れる。ロールバックは、前のリビジョンへのトラフィックの切り替えで行い、down マイグレーションは使わない。</td></tr>
+<tr><td>Cloud Build</td><td>ビルドの実行主体に <code>roles/run.admin</code>、実行用サービスアカウントへの <code>roles/iam.serviceAccountUser</code>、<code>roles/artifactregistry.writer</code>、<code>roles/logging.logWriter</code> が要る。<code>run</code>、<code>sqladmin</code>、<code>secretmanager</code>、<code>artifactregistry</code>、<code>cloudbuild</code> の API を有効にする。<code>--set-cloudsql-instances</code>（<code>--add-</code> ではなく）を使って、集合を確定させる。最初のステップで、<code>_SQL_INSTANCE</code> か <code>_RUNTIME_SA</code> が空なら早く失敗させる。組織ポリシーが <code>allUsers</code> を禁止していると <code>--allow-unauthenticated</code> は失敗する（デプロイ時に確認する）。</td></tr>
+<tr><td>コンテナ</td><td>バックエンド: <code>$PORT</code> に従い、uvicorn は <code>--proxy-headers --forwarded-allow-ips='*'</code> で起動し、<code>UV_NO_CACHE=1</code>、<code>UV_PYTHON_DOWNLOADS=never</code> を設定し、uv のイメージはダイジェストで固定する。フロントエンド: Next が <code>.next/cache</code> に書けるよう、<code>COPY --chown=app</code> にする。</td></tr>
+<tr><td>セキュリティヘッダー</td><td>フロントは CSP、<code>X-Content-Type-Options</code>、<code>Referrer-Policy</code>、<code>frame-ancestors 'none'</code>、HSTS を設定する（Markdown の XSS の決定 U7 も支える）。CORS のミドルウェアは入れない。書き手の API を守るのは Basic 認証の認証情報だけなので、24 文字以上のランダムなパスワードにし、総当たりへの備えにはインスタンス数の上限を使う。</td></tr>
+<tr><td>データベース</td><td>自動バックアップとポイントインタイムリカバリを有効にし、削除保護をかけ、SSL を必須にする。アプリ用の最小権限のユーザーは、マイグレーション（オーナー）用のユーザーと分ける。パスワードの記号は URL エンコードし、シークレットの末尾に改行を入れない。</td></tr>
+<tr><td>ログとヘルスチェック</td><td><code>severity</code> と <code>X-Cloud-Trace-Context</code> のトレースを含む JSON ログと、リクエスト ID。<code>/healthz</code> は DB に触れず、起動プローブとして使う。マイグレーションは起動時には実行しない。</td></tr>
+</table></div>
+</details>
+
+<details class="opt"><summary>AI による下書き生成（計画から除外。余裕があれば。クリックで開く）</summary>
+<h3>Claude API による下書きの生成（除外。余裕があれば）</h3>
+<p>Cloud Run 上の API から Claude API を呼べます。従量課金のクラウドサービスを呼ぶ形では、無制限に呼ばれて費用が青天井になりうるので、費用は<b>前払いのクレジット</b>で頭打ちにします。決まった金額だけを入れておき、使い切ったら、この機能は止まるだけです。<b>計画した実装からも、評価の範囲からも除外</b>し、コア機能、不変条件のテスト、README、採用済みの任意機能がすべて済んだあとに、余裕があれば追加します（13 節 R15）。</p>
+<div class="flow">
+  <div class="n fe">編集フォーム:「下書きを生成」+ テーマ</div><span class="a">→</span>
+  <div class="n be">POST /ai/draft（Basic 認証）</div><span class="a">→</span>
+  <div class="n">Claude API（キーは Secret Manager から）</div><span class="a">→</span>
+  <div class="n be">結果を正規化して切り詰める</div><span class="a">→</span>
+  <div class="n fe">フォームに提案を表示</div><span class="a">→</span>
+  <div class="n be">書き手が PATCH で保存（<code>expected_draft_version</code>）</div>
+</div>
+<ul>
+  <li><b>何も書き込みません。</b>エンドポイントは提案を返すだけです。文章は通常の編集で下書きに入るので、不変条件には触れず、書き手が Publish するまで何も公開されません。</li>
+  <li><b>支出は前払いのクレジットで頭打ちにします。</b>Anthropic のコンソールで、自動チャージをオフにし、ワークスペースの利用上限を設定します（作るときに確認します）。クレジットを使い切ったら、このルートは 503 <code>ai_unavailable</code> を返し、サイトのほかの部分には影響しません。</li>
+  <li>Claude のクライアントは小さなインターフェース（<code>DraftGenerator</code>）の裏に置きます。テストは偽物を使うので、<code>make test</code> にキーは要らず、費用もかかりません。</li>
+  <li>設定: キーを Secret Manager に <code>anthropic-api-key</code> として保存し、<code>ANTHROPIC_API_KEY</code> として渡します。<code>AI_ENABLED=true</code> と <code>ANTHROPIC_MODEL</code>（小さく安価なモデル。作るときに選び、確認する）を設定します。キーはコードに書かず、ログにも出しません。Cloud Run に追加の権限は要りません。</li>
+  <li>さらに: 既定はオフ、タイムアウトは 30 秒、入力長と出力トークンの上限、インスタンスごとのレート制限、インスタンス数の上限、プロンプトの全文はログに出さない。</li>
+  <li>出力は、ほかの入力と同じ扱い（tags は小文字にして 10 個まで、title は 200 文字、body は 100,000 文字）で、同じサニタイザー（U7）を通して描画するので、生成された文章が HTML を注入することはありません。テーマの文章は Claude API に送られます。</li>
+</ul>
+</details>
+
+<h3>評価の確認方法</h3>
+<p>評価者は私たちの Cloud SQL に接続できないので、<b>デプロイ済みの Cloud Run 上の成果物</b>で動作を確認します。URL は README の最初に書き、Basic 認証の認証情報はリポジトリの外で共有します。評価の間は、Cloud SQL と Cloud Run のサービスを動かしておきます。<code>make setup</code> と <code>make dev</code> も、<code>DATABASE_URL</code> で指定した任意の PostgreSQL に対して動きます。</p>
+
+<div class="note"><b>書き手側は Basic 認証（本番では必須、ローカルの実行では既定でオフ）:</b> 課題では認証は Out of Scope ですが、デプロイ先で誰でも編集・公開・削除できてしまうのを避けるため、書き手側（<code>/studio</code> と書き手の API）にだけ Basic 認証を入れます。検証は FastAPI が行い（API を直接呼ばれても守れるように）、Next.js は <code>Authorization</code> ヘッダーを転送します。公開サイトと公開用 API（<code>/api/v1/public/*</code>）は認証なしです。ID とパスワードは環境変数（本番は Secret Manager）で渡します。</div>
+
+<!-- 12 -->
+<h2 id="tests">12. テスト計画とビルド順</h2>
+<p>自動テストは必須で、UI のテストより重要です。各不変条件に少なくとも1つのテストがあり、<code>make test</code> がすべてを実行します。保証は DB の中にあるので、テストはモックではなく、本物の PostgreSQL（<code>_test</code> の DB）で動かします。</p>
+
+<h3>一覧: 各不変条件を何が守り、何件のテストが確認するか</h3>
+<div class="scroll"><table>
+<tr><th>不変条件</th><th>アプリの規則</th><th>DB の守り</th><th>自動テスト</th></tr>
+<tr><td>INV-1 スナップショットは不変</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-2 Publish は原子的</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-3 保護された版は削除不可</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:110px"></span> 5</td></tr><tr><td>INV-4 Restore は履歴を壊さない</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>INV-5 同時編集の検知</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-6 公開停止後も履歴を保持</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>Idempotent Publish（U8）</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>Slug の重複処理（U15）</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>AI による下書き生成（R15、任意）</td><td><code>test_ai_draft_returns_proposal_and_writes_nothing</code>（偽のクライアント）、<code>test_ai_draft_requires_basic_auth</code>、<code>test_ai_upstream_error_or_used_up_credit_gives_503</code>、<code>test_ai_output_is_normalized_and_clipped</code>、<code>test_ai_route_absent_when_disabled</code>（<code>tests/api</code>。Claude API を呼ぶテストはない）</td></tr>
+<tr><td>公開側（FR-10〜FR-12）</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>Basic 認証（FR-13）</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr>
+</table></div>
+<p class="cap">塗りつぶした丸は、そこで強制されることを表します。すべての不変条件に自動テストが少なくとも1つあり、多くはアプリと DB で二重に守られています。</p>
+
+<h3>12.1 不変条件ごとのテスト（探しやすいように名前を決める）</h3>
+<div class="scroll"><table>
+<tr><th>不変条件 / 操作</th><th>テスト（特記がなければ <code>tests/integration</code>）</th></tr>
+<tr><td>INV-1 スナップショットは不変</td><td><code>test_publish_creates_snapshot_from_draft</code>、<code>test_editing_draft_after_publish_leaves_snapshot_and_public_page</code>、<code>test_raw_update_on_version_rejected_by_trigger</code>、<code>test_truncate_versions_rejected</code></td></tr>
+<tr><td>INV-2 Publish は原子的</td><td><code>test_publish_rolls_back_on_failure_at_each_step</code>（手順ごとにパラメータ化。新しい行がなく、<code>status</code>、参照、<code>published_at</code>、<code>draft_version</code>、<code>last_version_number</code> が変わらないことを確認）、<code>test_concurrent_publish_exactly_one_201_other_409</code>（<code>asyncio.gather</code>、別々の接続、5xx なし、番号は連続）、<code>test_check_rejects_published_without_pointer_or_published_at</code>、<code>test_guard_blocks_return_to_draft_and_pointer_moving_back</code></td></tr>
+<tr><td>INV-3 保護された版は削除不可</td><td><code>test_delete_live_version_409</code>、<code>test_delete_after_unpublish_409</code>、<code>test_delete_old_version_after_republish_204</code>、<code>test_delete_vs_publish_race_no_5xx_no_dangling_pointer</code>、<code>test_delete_missing_version_404</code></td></tr>
+<tr><td>INV-4 Restore は履歴を壊さない</td><td><code>test_restore_copies_only_draft_and_leaves_all_versions_identical</code>（全行・全列を比較）、<code>test_restore_on_unpublished_never_published_published_keeps_status_pointer_published_at</code>、<code>test_restore_missing_version_404</code></td></tr>
+<tr><td>INV-5 同時編集</td><td><code>test_stale_edit_409_and_nothing_changes</code>、<code>test_draft_version_increments_on_edit_restore_and_publish_only</code>、<code>test_edit_vs_restore_exactly_one_wins</code>、<code>test_publish_with_stale_expected_version_409_no_snapshot</code></td></tr>
+<tr><td>INV-6 公開停止後も履歴を保持</td><td><code>test_unpublish_keeps_snapshot_pointer_and_published_at</code>、<code>test_republish_keeps_first_published_at</code>、<code>test_unpublish_non_published_409</code></td></tr>
+<tr><td>Idempotent Publish（U8）</td><td><code>test_publish_unchanged_draft_returns_200_and_one_version</code>、<code>test_draft_equal_to_old_version_creates_new_version</code>、<code>test_publish_unchanged_after_unpublish_flips_status_only</code></td></tr>
+<tr><td>Slug の重複処理（U15）</td><td><code>test_create_with_taken_slug_gets_numeric_suffix</code>、<code>test_concurrent_creates_with_same_slug_get_distinct_slugs_no_500</code>、<code>test_suffix_keeps_slug_within_100_chars</code>、<code>test_slug_cannot_be_changed_after_creation</code></td></tr>
+<tr><td>公開側（FR-10〜FR-12）</td><td><code>test_public_detail_reads_snapshot_not_draft</code>、<code>test_public_404_never_published_unpublished_missing_and_malformed_slug_identical</code>、<code>test_public_list_shape_and_order</code>、<code>test_public_schema_has_no_draft_fields</code>（<code>tests/api</code>）</td></tr>
+<tr><td>認証（FR-13）</td><td><code>test_every_writer_route_requires_basic_auth</code>（<code>app.routes</code> を走査）、<code>test_auth_checked_before_404_and_422</code>、<code>test_public_route_ignores_authorization_header</code>、<code>test_app_refuses_to_start_in_prod_unless_auth_enabled_with_credentials</code>、<code>test_enabled_auth_with_empty_credentials_refuses_to_start</code>、<code>test_auth_off_locally_lets_writer_routes_through_and_warns</code>（<code>tests/api</code>）</td></tr>
+<tr><td>テストの安全</td><td><code>test_guard_aborts_unless_database_name_ends_in_test_and_host_is_local</code>（<code>tests/unit</code>）</td></tr>
+<tr><td>フロントエンド</td><td>Markdown のサニタイズ（<code>javascript:</code> のリンク、生の <code>&lt;script&gt;</code>）、型チェック、lint、生成した OpenAPI の型が最新であること（<code>make check-api</code>）</td></tr>
+</table></div>
+
+<h3>12.2 ビルド順（tasks が従う順序）</h3>
+<div class="flow">
+  <div class="n">1. 憲章、spec、plan、tasks（最初にコミット）</div><span class="a">→</span>
+  <div class="n db">2. スキーマ（<code>001_schema.sql</code>）と制約のテスト</div><span class="a">→</span>
+  <div class="n be">3. Service のライフサイクル。不変条件を1つずつ、テストを先に</div><span class="a">→</span>
+  <div class="n be">4. 書き手の API、次に公開の API</div><span class="a">→</span>
+  <div class="n fe">5. 最小の UI</div><span class="a">→</span>
+  <div class="n">6. README、次に Cloud Run</div>
+</div>
+<ul>
+  <li>仕様は、<code>backend/src</code> と <code>frontend/src</code> のどのファイルよりも先にコミットする。<code>scripts/check-spec-first.sh</code> がこの順序を確認する。</li>
+  <li>各不変条件では、それを満たすコードより先に、失敗するテストを書く。UI とデプロイ用ファイルに着手する前に、不変条件を仕上げる。</li>
+  <li>時間が足りなければ、機能を足すのをやめ、不変条件とそのテストを仕上げ、できなかったこと（と作る予定だった方法）を README に書く。</li>
+</ul>
+
+<footer>この資料はリポジトリ直下の <code>docs/</code> にあります。フロント・バックで共通です。</footer>
+</div>
+</body>
+</html>

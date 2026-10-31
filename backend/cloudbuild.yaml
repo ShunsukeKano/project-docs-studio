@@ -1,0 +1,73 @@
+# Cloud Build: build -> migrate (Cloud Run Job) -> deploy to Cloud Run
+# Run: gcloud builds submit --config cloudbuild.yaml \
+#         --substitutions=_SQL_INSTANCE=PROJECT:REGION:INSTANCE,_RUNTIME_SA=api-sa@PROJECT.iam.gserviceaccount.com
+#
+# Prerequisites (create once, by hand):
+#   - An Artifact Registry repository (_AR_REPO)
+#   - A Cloud SQL for PostgreSQL instance and database
+#   - Secret Manager secrets: database-url, basic-auth-user, basic-auth-password
+#       e.g. postgresql+asyncpg://USER:PASS@/DBNAME?host=/cloudsql/PROJECT:REGION:INSTANCE
+#   - Grant the runtime service account (_RUNTIME_SA) roles/cloudsql.client and
+#     roles/secretmanager.secretAccessor on the secrets
+substitutions:
+  _REGION: asia-northeast1
+  _AR_REPO: docs-studio
+  _SERVICE: docs-studio-api
+  _JOB: docs-studio-api-migrate
+  _SQL_INSTANCE: ""   # PROJECT:REGION:INSTANCE
+  _RUNTIME_SA: ""
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID", "."]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID"]
+
+  # Run migrations in a separate job rather than in the start command
+  - id: deploy-migrate-job
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - deploy
+      - ${_JOB}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID
+      - --region=${_REGION}
+      - --service-account=${_RUNTIME_SA}
+      - --set-cloudsql-instances=${_SQL_INSTANCE}
+      - --set-secrets=DATABASE_URL=database-url:latest
+      - --command=alembic
+      - --args=upgrade,head
+
+  - id: run-migrate-job
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args: ["run", "jobs", "execute", "${_JOB}", "--region=${_REGION}", "--wait"]
+
+  # Cloud Run itself is exposed without authentication. The writer API is protected by
+  # Basic authentication in FastAPI (basic-auth-user / basic-auth-password are passed from Secret Manager).
+  - id: deploy-service
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID
+      - --region=${_REGION}
+      - --service-account=${_RUNTIME_SA}
+      - --add-cloudsql-instances=${_SQL_INSTANCE}
+      - --set-secrets=DATABASE_URL=database-url:latest,BASIC_AUTH_USER=basic-auth-user:latest,BASIC_AUTH_PASSWORD=basic-auth-password:latest
+      - --set-env-vars=ENV=prod,BASIC_AUTH_ENABLED=true
+      - --port=8000
+      - --allow-unauthenticated
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID
+
+options:
+  logging: CLOUD_LOGGING_ONLY

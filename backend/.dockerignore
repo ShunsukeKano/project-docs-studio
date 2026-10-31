@@ -1,0 +1,17 @@
+.git
+.claude
+.specify
+specs
+docs
+tests
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.env
+.env.*
+!.env.example
+cloudbuild.yaml
+CLAUDE.md

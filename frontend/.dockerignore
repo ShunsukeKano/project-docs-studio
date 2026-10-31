@@ -1,0 +1,13 @@
+.git
+.claude
+.specify
+specs
+docs
+node_modules
+.next
+.env
+.env.*
+!.env.example
+tests
+cloudbuild.yaml
+CLAUDE.md

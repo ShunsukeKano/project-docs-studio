@@ -1,0 +1,42 @@
+# Cloud Build: build -> deploy to Cloud Run (as the public site)
+# Run: gcloud builds submit --config cloudbuild.yaml \
+#         --substitutions=_API_URL=https://docs-studio-api-xxxx.a.run.app,_RUNTIME_SA=web-sa@PROJECT.iam.gserviceaccount.com
+#
+# Prerequisites (create once, by hand):
+#   - An Artifact Registry repository (_AR_REPO)
+#   - The backend Cloud Run service is already deployed (_API_URL is its URL; no ID token is needed)
+substitutions:
+  _REGION: asia-northeast1
+  _AR_REPO: docs-studio
+  _SERVICE: docs-studio-web
+  _API_URL: ""
+  _RUNTIME_SA: ""
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID", "."]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID"]
+
+  - id: deploy-service
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID
+      - --region=${_REGION}
+      - --service-account=${_RUNTIME_SA}
+      - --set-env-vars=API_BASE_URL=${_API_URL},BASIC_AUTH_ENABLED=true
+      - --port=3000
+      - --allow-unauthenticated
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID
+
+options:
+  logging: CLOUD_LOGGING_ONLY

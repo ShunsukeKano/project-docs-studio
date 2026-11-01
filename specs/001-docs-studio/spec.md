@@ -29,6 +29,8 @@ A writer creates an article by entering a title, a slug (the article's address),
 3. **Given** a slug that is already taken, **When** a writer creates another article with it, **Then** the new article is created with a number appended to the slug (for example `-2`), and the writer is shown the slug that was actually stored.
 4. **Given** invalid input (an empty title, a malformed slug, too many tags, or a body that is too long), **When** the writer saves it, **Then** it is rejected with a clear message and nothing is changed.
 5. **Given** a stored article, **When** the writer tries to change its slug, **Then** the change is refused; a slug never changes after creation.
+6. **Given** the writer opens "New article", **When** the screen appears, **Then** it is the full editor (title, slug, tags, body and a live preview) and **nothing has been created yet**; an article exists only after the writer saves it. *(Amendment A-1.)*
+7. **Given** a new article being written, **When** the writer types a title and has not edited the slug, **Then** the slug is filled in from the title; if the writer leaves it empty (or the title gives nothing usable, for example a title with no letters or digits), a slug is generated, so a first save never needs an extra step. The slug field accepts only the slug itself; a pasted address (for example one that starts with `/docs/`) is reduced to the slug. *(Amendment A-1.)*
 
 ---
 
@@ -48,6 +50,13 @@ A writer publishes the current draft. The system freezes the draft's title, body
 4. **Given** two publish requests arrive at the same moment from the same screen state, **When** they are processed, **Then** exactly one succeeds and the other is rejected as out of date; there are never two snapshots from one screen state, no server error, and snapshot numbers stay in unbroken order.
 5. **Given** a draft whose title or body is empty, **When** the writer publishes, **Then** the publish is refused with a clear message and nothing is created.
 6. **Given** any moment in time, **When** the data is inspected, **Then** none of these states ever exist: published with no live snapshot; published but pointing at an old snapshot; not published but a live snapshot is set.
+
+
+**Acceptance Scenarios (amendment A-2, save and publish in one step)**:
+
+6. **Given** a draft with unsaved changes in the editor, **When** the writer chooses "Save & publish", **Then** the changes are saved as the draft first and the draft that was just saved is published as the next snapshot; the writer does not have to save separately.
+7. **Given** a new article being written, **When** the writer chooses "Save & publish", **Then** the article is created and its first snapshot is published in the same action (the body must not be empty).
+8. **Given** the save worked but publishing was refused (for example because the draft changed in the meantime), **When** the writer is told the result, **Then** the message says the changes **were saved** and that only publishing failed, and the draft is not lost.
 
 ---
 
@@ -163,6 +172,25 @@ Everything a writer does (the writing screens and all the operations behind them
 
 ---
 
+### User Story 9 - Generate the body with AI (Priority: P3, optional extra, outside the assessed scope)
+
+A writer who has entered a title (and perhaps some tags and rough notes) can press one button to ask an AI model (Claude) to write the article body from them. The result is only a **proposal**: it fills the body field of the editor, and the writer reviews, edits and saves it like any other text. The button is always visible in the editor; it works only when an operator has turned the feature on.
+
+**Why this priority**: It is a convenience, not part of the assignment. It was built only after the core lifecycle was finished and tested, and it cannot change any invariant because it never saves or publishes anything itself.
+
+**Independent Test**: With the feature off, the button is shown disabled with a note on how to switch it on, and the AI operation answers "not available". With it on and a fake model behind it, a request built from the title and tags returns a body, the article list and the snapshot list are unchanged, and a request over the limits is refused.
+
+**Acceptance Scenarios**:
+
+1. **Given** the AI feature is off (the default), **When** a writer opens the editor (a new article or an existing draft), **Then** the "Generate with AI" button is visible but disabled, with a short note on how to switch the feature on, and calling the operation directly returns a clear "not available" answer.
+2. **Given** the feature is on and the writer has entered a title (and optionally tags and notes in the body), **When** the writer presses "Generate with AI", **Then** the proposed body appears in the body field **progressively, as the model writes it** (not all at once), the title and tags are left exactly as typed, the result is marked as an AI proposal to review, and **nothing is saved or published** until the writer saves. While it is being written the writer can stop it and keep what has arrived.
+3. **Given** the form already has body text, **When** the writer presses the button, **Then** the writer is asked before it is replaced; the existing text is also sent as notes for the model to build on.
+4. **Given** the title is empty, too long, or the notes or instructions are too long, or requests come faster than the limit, **When** the writer presses the button, **Then** the request is refused with a clear message and no model call is made.
+5. **Given** the model is unreachable, refuses, or stops part-way (a failure at the start, or in the middle of the stream), **When** the writer presses the button, **Then** the writer sees a plain failure message with no internal detail; a failure before any text arrives leaves the body exactly as it was, and a failure in the middle keeps the text that arrived and says it was cut off.
+6. **Given** the feature is on, **When** anyone without the writer credentials calls it, **Then** it is refused like every other writer operation (sign-in comes first).
+
+---
+
 ### Edge Cases
 
 - **Failure and crash during publish**: any failure at any step leaves no trace; the next publish still gets the next snapshot number without gaps from the failed attempt.
@@ -257,6 +285,14 @@ Everything a writer does (the writing screens and all the operations behind them
 
 - **FR-038**: The interface MUST be minimal, clean and consistent in how it looks: readable from phone width to desktop width, usable with the keyboard with a visible focus, using one accent colour and generous whitespace, and showing friendly empty and error states. Styling is done after the functionality and must not delay it.
 
+**Amendments made after implementation** *(see "Amendments" at the end of this document; each one was built and tested after the first version of this specification was committed)*
+
+- **FR-039** *(A-1)*: A writer MUST be able to start a new article directly in the editor, without a separate "create" step. Nothing MUST exist until the writer saves; the slug follows the title until it is edited by hand, is generated when left empty, and cannot be changed after the first save (FR-006 still applies).
+- **FR-040** *(A-2)*: The editor MUST offer "Save & publish": with unsaved changes it saves the draft and then publishes the version it just saved, as two ordered steps with the existing rules (version check, non-empty content, one atomic publish). If publishing fails after the save, the writer MUST be told the draft was saved. The publish itself stays one atomic operation (INV-002); the combined action is not required to be atomic.
+- **FR-041** *(A-3)*: Every page of the web app (public and writer) MUST use the same content width, so the article page and the editor line up.
+- **FR-042** *(A-7, optional extra)*: The system MAY offer AI body generation (AI-1) from the title, tags and notes the writer has already entered. It MUST be off by default and switched on by one explicit setting; when on without a key the service MUST refuse to start. The editor MUST always show the button, disabled with a note when the feature is off. It MUST be a writer operation (protected like the others) that returns a **proposal only**, as the body text **streamed progressively** (the title and tags stay as the writer typed them), and MUST NOT create, change, save or publish anything. The key MUST come from the environment, never from code, and neither it nor the writer's text MUST be logged. Input length (title, tags, notes, instructions), output length and request rate MUST be limited, and a refused or failed model call MUST give a plain message without internal detail, including a failure that happens after streaming has started. Automated tests MUST NOT call the real model. The model is named by a setting (default `claude-sonnet-4-6`).
+- **FR-043** *(A-8)*: The live Markdown preview MUST NOT slow typing down: the editor input is rendered at once and the preview follows it with a deferred render.
+
 ### Invariants
 
 These must hold at every moment, and each one has at least one automated test.
@@ -293,6 +329,8 @@ These must hold at every moment, and each one has at least one automated test.
 - **SC-011**: One command shows that the specification, plan and task list were committed before any implementation file.
 - **SC-012**: An assessor can verify the main behaviours on the deployed site without installing anything.
 - **SC-013**: On a machine with only Docker installed, one command starts the whole system from a fresh checkout, and a writer can then create and publish a first article.
+- **SC-014** *(A-1, A-2)*: A writer can open "New article", write a title and a body, and press "Save & publish" once; the article is then public. This was run in a real browser (headless Chrome) against the running system.
+- **SC-016** *(A-7)*: With the AI feature off, the button is visible but disabled and the AI operation answers "not available"; with it on and a fake model, a body is streamed in several pieces from the title and tags without any article or snapshot being created. Neither case calls the real model in the test suite.
 
 ## Assumptions
 
@@ -315,4 +353,21 @@ These must hold at every moment, and each one has at least one automated test.
 - Deleting an article itself.
 - The optional features Save as Version and Diff View.
 - Production deployment automation, CI/CD and infrastructure as code (a simple deployment is provided as a low-priority extra and is not part of the assessed scope).
-- **AI-generated drafts (called AI-1 here; FR-17 in `docs/requirements.md`)**: not planned; it may be added only if everything else is finished, and it would never save or publish anything by itself.
+- **AI-generated drafts (called AI-1 here; FR-17 in `docs/requirements.md`)**: **outside the assessed scope**, but built afterwards as a convenient extra (User Story 9, FR-042, amendment A-7). It is off by default, returns a proposal only and never saves or publishes anything by itself.
+
+## Amendments
+
+The original specification was committed before any implementation (FR-036). The changes below were agreed **after** implementation had started, while the application was being tried by hand. They are recorded here so the specification, plan and tasks match what was built; they do not weaken any invariant, and each has tests or a recorded check.
+
+| ID | Change | Why | Where it is built |
+|---|---|---|---|
+| A-1 | New articles are written directly in the editor; nothing is created until the first save. The old "create" form (title and slug only) is gone. | The extra step before writing was in the way (writer feedback). | `frontend/src/features/articles/new-article-form.tsx`, `studio/new/page.tsx`, `createArticleDirect` in `studio/actions.ts` |
+| A-1 | The slug field holds only the slug; a pasted address is reduced to the slug. | Typing a whole address into the slug field was confusing. | `stripAddress`, `slugForNewArticle` in `frontend/src/lib/format.ts` (tested) |
+| A-2 | "Save & publish" in the editor and on the new-article screen. | Writers wanted to publish without a separate save. | `article-workspace.tsx`, `new-article-form.tsx` |
+| A-3 | One content width on all pages. | The article page and the editor were different widths. | the two `layout.tsx` files |
+| A-4 | The OpenAPI document describes validation errors with the real error envelope, declares the Basic authentication scheme on writer operations, and the contract lists the 422 that path-parameter validation produces. | The generated document did not match the contract; found by the contract test (T083). | `_tidy_openapi` in `backend/src/app/main.py`; `contracts/openapi.yaml` |
+| A-5 | The test-database guard accepts one extra host only when it is named in `TEST_DATABASE_EXTRA_HOSTS` (the Compose `db-test` service); the name rule is never relaxed. | The test container reaches the database by service name, not `localhost`. | `backend/tests/db_guard.py`, `compose.yaml` |
+| A-6 | The web app answers a missing sign-in with `401` and `WWW-Authenticate` on the requested address itself, not through a redirect to `/auth/challenge`. | Browsers send saved credentials only to the path that challenged them, so a redirect would loop. | `frontend/src/proxy.ts` |
+| A-7 | Optional extra: one "Generate with AI" button that writes the body from the title, tags and notes already entered (Claude, `claude-sonnet-4-6` by default), off by default, proposal only, button always visible. | A convenience for writers who know the title but not how to start the text; kept out of the core so no invariant depends on it. | `backend/src/app/domains/ai/`, `routes/ai.py`, settings `AI_ENABLED`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`; `frontend/src/features/articles/ai-generate-bar.tsx` |
+| A-8 | The live preview follows the text with a deferred render (`useDeferredValue`). | Re-rendering Markdown on every keystroke is wasted work for long bodies. | `editor-form.tsx`, `new-article-form.tsx` |
+| A-9 | The AI body is streamed: it appears piece by piece as the model writes it, can be stopped, and the model's tag suggestions were dropped (the writer's tags are never changed). | A full reply takes several seconds; showing it progressively feels faster and lets the writer stop early. Streaming plain text is simpler than streaming a JSON answer. | `backend/src/app/domains/ai/generator.py`, `routes/ai.py` (server-sent events); `frontend/src/app/(studio)/studio/ai-draft/route.ts`, `ai-generate-bar.tsx` |

@@ -1,32 +1,62 @@
-# Cloud Build: build -> migrate (Cloud Run Job) -> deploy to Cloud Run
-# Run: gcloud builds submit --config cloudbuild.yaml \
-#         --substitutions=_SQL_INSTANCE=PROJECT:REGION:INSTANCE,_RUNTIME_SA=api-sa@PROJECT.iam.gserviceaccount.com
+# Cloud Build: check inputs -> build -> push -> migrate (Cloud Run Job) -> deploy (Cloud Run service)
 #
-# Prerequisites (create once, by hand):
-#   - An Artifact Registry repository (_AR_REPO)
-#   - A Cloud SQL for PostgreSQL instance and database
-#   - Secret Manager secrets: database-url, basic-auth-user, basic-auth-password
-#       e.g. postgresql+asyncpg://USER:PASS@/DBNAME?host=/cloudsql/PROJECT:REGION:INSTANCE
-#   - Grant the runtime service account (_RUNTIME_SA) roles/cloudsql.client and
-#     roles/secretmanager.secretAccessor on the secrets
+# Run once by hand on 2026-11-01 and it succeeded (build, push, deploy). The writer scenarios of the
+# quickstart have not been run on the deployed site by the author.
+#
+# Run from the repository root:
+#   gcloud builds submit backend --config backend/cloudbuild.yaml \
+#     --substitutions=_SQL_INSTANCE=PROJECT:REGION:INSTANCE,_RUNTIME_SA=api-sa@PROJECT.iam.gserviceaccount.com
+#
+# Prerequisites (create once, by hand; see docs/requirements.md section 12):
+#   - An Artifact Registry Docker repository named _AR_REPO in _REGION
+#   - A Cloud SQL for PostgreSQL instance and a production database (kept separate from development and test)
+#   - Secret Manager secrets: database-url, basic-auth-user, basic-auth-password, and (only if the optional
+#     AI extra is switched on with _AI_ENABLED=true) anthropic-api-key. Secrets are never put in this file,
+#     the image or the build log: Cloud Run reads them from Secret Manager and hands them to the app as
+#     environment variables when it starts.
+#       database-url looks like
+#       postgresql+asyncpg://USER:PASSWORD@/DBNAME?host=/cloudsql/PROJECT:REGION:INSTANCE
+#   - The runtime service account (_RUNTIME_SA) with roles/cloudsql.client and
+#     roles/secretmanager.secretAccessor on those secrets (it needs access to anthropic-api-key only if AI is on)
+#   - The Cloud Build service account allowed to deploy Cloud Run (roles/run.admin) and to act as
+#     the runtime service account (roles/iam.serviceAccountUser)
 substitutions:
   _REGION: asia-northeast1
   _AR_REPO: docs-studio
   _SERVICE: docs-studio-api
   _JOB: docs-studio-api-migrate
-  _SQL_INSTANCE: ""   # PROJECT:REGION:INSTANCE
-  _RUNTIME_SA: ""
+  _SQL_INSTANCE: ""   # PROJECT:REGION:INSTANCE (required)
+  _RUNTIME_SA: ""     # runtime service account e-mail (required)
+  _MAX_INSTANCES: "3" # with pool_size=3 and max_overflow=2 this keeps connections at 15 or fewer
+  _AI_ENABLED: "false" # optional AI extra; "true" also needs the anthropic-api-key secret
+  _ANTHROPIC_MODEL: claude-sonnet-4-6
 
 steps:
+  # Fail fast, before anything is built, if a required value was not supplied.
+  - id: check-substitutions
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        test -n "${_SQL_INSTANCE}" || { echo "_SQL_INSTANCE is empty" >&2; exit 1; }
+        test -n "${_RUNTIME_SA}" || { echo "_RUNTIME_SA is empty" >&2; exit 1; }
+        case "${_AI_ENABLED}" in true|false) ;; *) echo "_AI_ENABLED must be true or false" >&2; exit 1;; esac
+
+  # Build only the "run" stage. The "test" stage is for local tests (it needs tests/, which is not
+  # uploaded). BuildKit skips stages the target does not need; the classic builder would run them all.
   - id: build
     name: gcr.io/cloud-builders/docker
-    args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID", "."]
+    env: ["DOCKER_BUILDKIT=1"]
+    args: ["build", "--target", "run", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID", "."]
 
   - id: push
     name: gcr.io/cloud-builders/docker
     args: ["push", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID"]
 
-  # Run migrations in a separate job rather than in the start command
+  # Migrations run in a separate Job, once per deploy, rather than in the start command.
+  # The Job needs only the database URL, so it does not set ENV=prod or the Basic credentials.
+  # It never retries: a failed migration should stop the deploy for a person to look at.
   - id: deploy-migrate-job
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
@@ -42,29 +72,42 @@ steps:
       - --set-secrets=DATABASE_URL=database-url:latest
       - --command=alembic
       - --args=upgrade,head
+      - --max-retries=0
+      - --task-timeout=600s
 
   - id: run-migrate-job
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args: ["run", "jobs", "execute", "${_JOB}", "--region=${_REGION}", "--wait"]
 
-  # Cloud Run itself is exposed without authentication. The writer API is protected by
-  # Basic authentication in FastAPI (basic-auth-user / basic-auth-password are passed from Secret Manager).
+  # Cloud Run itself is open to the internet. The writer API is protected by Basic authentication
+  # inside FastAPI (BASIC_AUTH_ENABLED=true, credentials from Secret Manager); the public API needs none.
+  # With ENV=prod the app refuses to start unless authentication is on and both credentials are set.
   - id: deploy-service
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID
-      - --region=${_REGION}
-      - --service-account=${_RUNTIME_SA}
-      - --add-cloudsql-instances=${_SQL_INSTANCE}
-      - --set-secrets=DATABASE_URL=database-url:latest,BASIC_AUTH_USER=basic-auth-user:latest,BASIC_AUTH_PASSWORD=basic-auth-password:latest
-      - --set-env-vars=ENV=prod,BASIC_AUTH_ENABLED=true
-      - --port=8000
-      - --allow-unauthenticated
+      - -c
+      - |
+        # Secrets come from Secret Manager (name:version); plain settings are ordinary variables.
+        # The AI key is mapped only when AI is switched on, so a deploy without AI needs no such secret.
+        SECRETS="DATABASE_URL=database-url:latest,BASIC_AUTH_USER=basic-auth-user:latest,BASIC_AUTH_PASSWORD=basic-auth-password:latest"
+        SETTINGS="ENV=prod,BASIC_AUTH_ENABLED=true,AI_ENABLED=${_AI_ENABLED},ANTHROPIC_MODEL=${_ANTHROPIC_MODEL}"
+        if [ "${_AI_ENABLED}" = "true" ]; then
+          SECRETS="$$SECRETS,ANTHROPIC_API_KEY=anthropic-api-key:latest"
+        fi
+        gcloud run deploy ${_SERVICE} \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID \
+          --region=${_REGION} \
+          --service-account=${_RUNTIME_SA} \
+          --add-cloudsql-instances=${_SQL_INSTANCE} \
+          --set-secrets="$$SECRETS" \
+          --set-env-vars="$$SETTINGS" \
+          --port=8000 \
+          --min-instances=0 \
+          --max-instances=${_MAX_INSTANCES} \
+          --cpu-boost \
+          --allow-unauthenticated
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID

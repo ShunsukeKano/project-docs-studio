@@ -1,18 +1,41 @@
-# Cloud Build: build -> deploy to Cloud Run (as the public site)
-# Run: gcloud builds submit --config cloudbuild.yaml \
-#         --substitutions=_API_URL=https://docs-studio-api-xxxx.a.run.app,_RUNTIME_SA=web-sa@PROJECT.iam.gserviceaccount.com
+# Cloud Build: check inputs -> build -> push -> deploy (Cloud Run service for the web app)
 #
-# Prerequisites (create once, by hand):
-#   - An Artifact Registry repository (_AR_REPO)
-#   - The backend Cloud Run service is already deployed (_API_URL is its URL; no ID token is needed)
+# Run once by hand on 2026-11-01 and it succeeded (build, push, deploy). The writer scenarios of the
+# quickstart have not been run on the deployed site by the author.
+#
+# Deploy the backend first (backend/cloudbuild.yaml) and use its URL here. From the repository root:
+#   gcloud builds submit frontend --config frontend/cloudbuild.yaml \
+#     --substitutions=_API_URL=https://docs-studio-api-xxxx.a.run.app,_RUNTIME_SA=web-sa@PROJECT.iam.gserviceaccount.com
+#
+# Prerequisites (create once, by hand; see docs/requirements.md section 12):
+#   - An Artifact Registry Docker repository named _AR_REPO in _REGION
+#   - The backend Cloud Run service already deployed (_API_URL is its address; the API is open to the
+#     internet, so no ID token is needed)
+#   - A runtime service account (_RUNTIME_SA). The web app needs no secrets: the writer's credentials
+#     come from the browser and are passed to the API, which is the only place that checks them.
+#   - The Cloud Build service account allowed to deploy Cloud Run (roles/run.admin) and to act as
+#     the runtime service account (roles/iam.serviceAccountUser)
 substitutions:
   _REGION: asia-northeast1
   _AR_REPO: docs-studio
   _SERVICE: docs-studio-web
-  _API_URL: ""
-  _RUNTIME_SA: ""
+  _API_URL: ""        # https address of the API service (required)
+  _RUNTIME_SA: ""     # runtime service account e-mail (required)
+  _MAX_INSTANCES: "3"
 
 steps:
+  # Fail fast, before anything is built, if a required value was not supplied.
+  - id: check-substitutions
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        test -n "${_API_URL}" || { echo "_API_URL is empty" >&2; exit 1; }
+        case "${_API_URL}" in https://*) ;; *) echo "_API_URL must start with https://" >&2; exit 1;; esac
+        test -n "${_RUNTIME_SA}" || { echo "_RUNTIME_SA is empty" >&2; exit 1; }
+
+  # `next build` needs no API address: it is read at run time, not at build time.
   - id: build
     name: gcr.io/cloud-builders/docker
     args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID", "."]
@@ -21,6 +44,8 @@ steps:
     name: gcr.io/cloud-builders/docker
     args: ["push", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$BUILD_ID"]
 
+  # The public site is open to the internet. With BASIC_AUTH_ENABLED=true, /studio asks the browser
+  # for the writer's credentials and passes them on; the API validates them.
   - id: deploy-service
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
@@ -33,6 +58,9 @@ steps:
       - --service-account=${_RUNTIME_SA}
       - --set-env-vars=API_BASE_URL=${_API_URL},BASIC_AUTH_ENABLED=true
       - --port=3000
+      - --min-instances=0
+      - --max-instances=${_MAX_INSTANCES}
+      - --cpu-boost
       - --allow-unauthenticated
 
 images:

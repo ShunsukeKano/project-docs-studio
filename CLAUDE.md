@@ -47,7 +47,7 @@ For a new feature or a large change, work in this order and commit each stage's 
 From a fresh checkout, `cp .env.example .env` and `docker compose up --build` start the whole system (PostgreSQL, the schema, the API and the web app) and need only Docker. `make setup`, `make dev` and `make test` run it natively against the Compose databases or any PostgreSQL given by `DATABASE_URL`. `make test-docker` runs the backend tests in a container with only Docker. The writer login is off by default for a local run (`BASIC_AUTH_ENABLED`; always on in production). The root `compose.yaml` is part of the short setup command, so it is not low priority.
 
 ## Deployment (GCP Cloud Run)
-Low priority and not verified until it has been built and run. Each service is built from its own folder, which has a `Dockerfile` and a `cloudbuild.yaml`.
+Low priority. It was built and deployed once by hand (2026-11-01); the writer scenarios were not run on the deployed site. Each service is built from its own folder, which has a `Dockerfile` and a `cloudbuild.yaml`.
 
 ```bash
 gcloud builds submit backend --config backend/cloudbuild.yaml

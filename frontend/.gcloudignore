@@ -1,0 +1,12 @@
+# What `gcloud builds submit frontend` must NOT upload to Cloud Build.
+.git
+.gcloudignore
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+tests/
+cloudbuild.yaml
+CLAUDE.md
+*.tsbuildinfo

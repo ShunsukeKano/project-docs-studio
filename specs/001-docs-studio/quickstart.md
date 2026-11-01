@@ -103,6 +103,18 @@ Reload a public article, unpublish it, and reload again.
 
 **Expect**: the article is gone on the very next request.
 
+### 11. Write a new article directly and publish it in one step (User Stories 1 and 2, amendments A-1 and A-2)
+
+In the browser, open `/studio`, press "New article", type a title, some tags and a body, and press "Save & publish". Then change the title in the editor and press "Save & publish" again.
+
+**Expect**: the screen is the full editor with a live preview and **no article exists yet** (the list is unchanged until you save); the slug fills in from the title (and a pasted address is reduced to the slug); after "Save & publish" the editor opens for the new article with the status Published; with an unsaved change the button reads "Save & publish", and pressing it saves and publishes the new text as version 2 with the message "Saved and published as version 2". If publishing is refused after the save, the message says the changes were saved.
+
+### 12. Generate the body with AI (User Story 9, optional extra; needs an API key)
+
+Off by default. In the editor or on the new-article screen the "Generate with AI" button is always visible; with the feature off it is disabled and says how to switch it on. To try it, put `AI_ENABLED=true` and your own `ANTHROPIC_API_KEY` in `.env` (never commit it) and restart. Enter a title (and perhaps tags) and press the button.
+
+**Expect**: with the feature off the button is disabled with a note and `GET $API/ai/status` says it is off; with it on, a Markdown body **appears piece by piece** in the body field while the button shows a Stop control (the title and tags are untouched), labelled as an AI proposal, and **nothing is saved or published** until you save; the article list is unchanged until then. Asking more often than the limit returns 429. The automated tests cover all of this with a fake model; a real call is a manual step because it needs a key and costs a few cents.
+
 ## Checking the automated tests cover the invariants
 
 The test names are listed in `docs/nextjs-fastapi-architecture.html` (section 12.1). After `make test`, confirm there is at least one passing test for each of INV-001 to INV-006, including: a raw `UPDATE` on a snapshot rejected by the database, a failure injected at each step of Publish leaving nothing changed, two simultaneous Publish calls giving one 201 and one 409, the protected version refused for deletion, and Restore leaving every snapshot row identical.

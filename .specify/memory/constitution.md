@@ -72,9 +72,12 @@ deployed, internet-facing service may not.
 ### V. Simplicity and Scope
 - The core lifecycle MUST be finished first. The only optional features adopted are Idempotent
   Publish and Slug collision handling.
-- AI draft generation (FR-17) is excluded from the plan. If it is ever built, it MUST use the Claude API
-  with prepaid credit, so spending is capped by the amount deposited. It MAY be added only after
-  everything else is complete, and it MUST NOT write anything by itself.
+- AI draft generation (FR-17, called AI-1 in the specification) is outside the assessed scope. It MAY be
+  built only after everything else is complete, as an opt-in extra that is **off by default**. It MUST
+  use the Claude API with prepaid credit, so spending is capped by the amount deposited; it MUST keep the
+  key out of the code and the logs; it MUST have input, output and rate limits; it MUST NOT write
+  anything by itself (it returns a proposal for the writer to review); and its tests MUST NOT call the
+  API. (Built after the core was complete: see amendment A-7 in the specification.)
 - The Cloud Run files (`cloudbuild.yaml`) are low priority. They MUST NOT delay the core features or
   the tests, and neither they nor the Dockerfiles may be described as verified until they have been
   built and run. The local `compose.yaml` is the exception: it is part of the short setup command, so
@@ -149,4 +152,8 @@ and a caching layer is out of scope.
   plan's complexity tracking.
 - Runtime guidance lives in the `CLAUDE.md` files and in `docs/`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-31 | **Last Amended**: 2026-10-31
+**Version**: 1.0.1 | **Ratified**: 2026-10-31 | **Last Amended**: 2026-11-01
+
+Amendment 1.0.1 (PATCH): Principle V now says how the optional AI draft extra may exist (off by default, limits,
+no secrets in code, proposal only, tests never call the API). Reason: the core was finished and the writers
+asked for the extra. No principle was removed or redefined.

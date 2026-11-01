@@ -1,0 +1,1654 @@
+{
+  "components": {
+    "schemas": {
+      "AiDraftRequest": {
+        "additionalProperties": false,
+        "description": "What the writer has already entered: the AI writes the body from it.",
+        "properties": {
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 5000,
+            "title": "Notes",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 30,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "AiDraftRequest",
+        "type": "object"
+      },
+      "AiStatus": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "AiStatus",
+        "type": "object"
+      },
+      "ArticleCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "default": "",
+            "maxLength": 100000,
+            "title": "Body",
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Slug",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 30,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "slug"
+        ],
+        "title": "ArticleCreate",
+        "type": "object"
+      },
+      "ArticleDetail": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "draft_body": {
+            "title": "Draft Body",
+            "type": "string"
+          },
+          "draft_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Draft Tags",
+            "type": "array"
+          },
+          "draft_title": {
+            "title": "Draft Title",
+            "type": "string"
+          },
+          "draft_version": {
+            "title": "Draft Version",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "live_version_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Version Number"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "unpublished"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "status",
+          "draft_title",
+          "draft_body",
+          "draft_tags",
+          "draft_version",
+          "published_at",
+          "live_version_number",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ArticleDetail",
+        "type": "object"
+      },
+      "ArticleSummary": {
+        "properties": {
+          "draft_version": {
+            "title": "Draft Version",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "unpublished"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "status",
+          "title",
+          "draft_version",
+          "updated_at"
+        ],
+        "title": "ArticleSummary",
+        "type": "object"
+      },
+      "ArticleUpdate": {
+        "additionalProperties": false,
+        "description": "A partial edit: omitted fields keep their value. There is no slug field on purpose.",
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "expected_draft_version": {
+            "minimum": 1.0,
+            "title": "Expected Draft Version",
+            "type": "integer"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 30,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "expected_draft_version"
+        ],
+        "title": "ArticleUpdate",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "ExpectedVersion": {
+        "additionalProperties": false,
+        "description": "The body of the operations that must be based on the draft the writer was looking at.",
+        "properties": {
+          "expected_draft_version": {
+            "minimum": 1.0,
+            "title": "Expected Draft Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_draft_version"
+        ],
+        "title": "ExpectedVersion",
+        "type": "object"
+      },
+      "PublicArticle": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "live_created_at": {
+            "format": "date-time",
+            "title": "Live Created At",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "tags",
+          "body",
+          "published_at",
+          "live_created_at"
+        ],
+        "title": "PublicArticle",
+        "type": "object"
+      },
+      "PublicArticleListItem": {
+        "description": "What a reader sees in the list. Nothing else is serialized (an allow-list).",
+        "properties": {
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "tags",
+          "published_at",
+          "updated_at"
+        ],
+        "title": "PublicArticleListItem",
+        "type": "object"
+      },
+      "PublishResult": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "draft_version": {
+            "title": "Draft Version",
+            "type": "integer"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "unpublished"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "version_number",
+          "status",
+          "published_at",
+          "draft_version"
+        ],
+        "title": "PublishResult",
+        "type": "object"
+      },
+      "VersionDetail": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_live": {
+            "title": "Is Live",
+            "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version_number",
+          "title",
+          "body",
+          "tags",
+          "created_at",
+          "is_live"
+        ],
+        "title": "VersionDetail",
+        "type": "object"
+      },
+      "VersionSummary": {
+        "description": "One row of the history: no body. `is_live` marks the protected snapshot.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_live": {
+            "title": "Is Live",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version_number",
+          "title",
+          "created_at",
+          "is_live"
+        ],
+        "title": "VersionSummary",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "description": "Credentials come from BASIC_AUTH_USER and BASIC_AUTH_PASSWORD.",
+        "scheme": "basic",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "Docs Studio API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/ai/draft": {
+      "post": {
+        "operationId": "generateDraft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events: `delta` pieces of the body, then `done`/`error`."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too many requests (code `rate_limited`). The `Retry-After` header says how long to wait."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The AI draft could not be made (code `ai_unavailable`). No internal detail is given."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "AI drafting is switched off (code `ai_disabled`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Stream a proposed body from the writer's title, tags and notes (nothing is saved)",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/ai/status": {
+      "get": {
+        "operationId": "getAiStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Is AI drafting switched on?",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles": {
+      "get": {
+        "operationId": "listArticles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "draft",
+                    "published",
+                    "unpublished"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ArticleSummary"
+                  },
+                  "title": "Response Listarticles",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "List all articles in any state, newest change first",
+        "tags": [
+          "writer"
+        ]
+      },
+      "post": {
+        "operationId": "createArticle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArticleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict (`version_conflict`, `slug_conflict`, `not_published` or `version_is_live`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Create an article (a never-published draft)",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles/{id}": {
+      "get": {
+        "operationId": "getArticle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Get one article, including its draft",
+        "tags": [
+          "writer"
+        ]
+      },
+      "patch": {
+        "operationId": "updateArticle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArticleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict (`version_conflict`, `slug_conflict`, `not_published` or `version_is_live`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Partially update the draft",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles/{id}/publish": {
+      "post": {
+        "operationId": "publishArticle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResult"
+                }
+              }
+            },
+            "description": "The draft equals the live snapshot."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict (`version_conflict`, `slug_conflict`, `not_published` or `version_is_live`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Publish the draft",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles/{id}/unpublish": {
+      "post": {
+        "operationId": "unpublishArticle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict (`version_conflict`, `slug_conflict`, `not_published` or `version_is_live`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Take a published article down",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles/{id}/versions": {
+      "get": {
+        "operationId": "listVersions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VersionSummary"
+                  },
+                  "title": "Response Listversions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Version history, newest first (without the body)",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles/{id}/versions/{n}": {
+      "delete": {
+        "operationId": "deleteVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict (`version_conflict`, `slug_conflict`, `not_published` or `version_is_live`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Delete a snapshot that is not protected",
+        "tags": [
+          "writer"
+        ]
+      },
+      "get": {
+        "operationId": "getVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Full content of one snapshot",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/articles/{id}/versions/{n}/restore": {
+      "post": {
+        "operationId": "restoreVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "N",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectedVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing or wrong credentials (code `unauthorized`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found (code `not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict (`version_conflict`, `slug_conflict`, `not_published` or `version_is_live`)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "summary": "Copy a snapshot into the draft",
+        "tags": [
+          "writer"
+        ]
+      }
+    },
+    "/api/v1/public/articles": {
+      "get": {
+        "operationId": "listPublicArticles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicArticleListItem"
+                  },
+                  "title": "Response Listpublicarticles",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid input (code `validation_error`)."
+          }
+        },
+        "summary": "List published articles, newest publication first",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/articles/{slug}": {
+      "get": {
+        "operationId": "getPublicArticle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicArticle"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The same body for every miss."
+          }
+        },
+        "summary": "Read one published article (its live snapshot)",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Healthz",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Healthz"
+      }
+    }
+  }
+}

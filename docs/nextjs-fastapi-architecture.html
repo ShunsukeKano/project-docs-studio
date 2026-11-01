@@ -274,7 +274,7 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <h3>5.1 Basic authentication through Server Actions</h3>
 <ul>
   <li>A Server Action runs on the server and has no <code>Authorization</code> header of its own. It reads the incoming header with <code>headers().get("authorization")</code> and passes it to the API on every call; the API client takes the header per call, never from a module-level singleton.</li>
-  <li>FastAPI is the only validator. <code>proxy.ts</code> only checks that the header is present on every <code>/studio/**</code> request (including action POSTs); it cannot validate.</li>
+  <li>FastAPI is the only validator. <code>proxy.ts</code> only checks that the header is present on every <code>/studio/**</code> request (including action POSTs); it cannot validate. When the header is missing it answers <code>401</code> with <code>WWW-Authenticate</code> on the requested address itself, because a redirect to another path would loop (browsers send saved credentials only to the path that challenged them).</li>
   <li>When the API answers 401, the action surfaces it, and the page redirects to <code>/auth/challenge</code>, a route handler that returns <code>401</code> with <code>WWW-Authenticate: Basic realm="studio"</code>. A Server Action cannot set that response header itself.</li>
   <li>Browsers cache Basic credentials per realm and path; there is no logout, which is accepted for this scope.</li>
 </ul>

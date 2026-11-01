@@ -1,0 +1,15 @@
+# What `gcloud builds submit backend` must NOT upload to Cloud Build.
+.git
+.gcloudignore
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+cloudbuild.yaml
+CLAUDE.md

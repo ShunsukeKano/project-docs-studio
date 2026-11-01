@@ -49,7 +49,7 @@
 新規チェックアウトから、`cp .env.example .env` と `docker compose up --build` で、システム全体（PostgreSQL、スキーマ、API、Web アプリ）が起動する。必要なのは Docker だけ。`make setup`、`make dev`、`make test` は、アプリをコンテナなしで、Compose の DB か、`DATABASE_URL` で指定した任意の PostgreSQL に対して動かす。`make test-docker` は、Docker だけでバックエンドのテストをコンテナの中で実行する。書き手のログインは、ローカルの実行では既定でオフ（`BASIC_AUTH_ENABLED`。本番では常にオン）。ルートの `compose.yaml` は、短いセットアップコマンドの一部なので、優先度は低くない。
 
 ## デプロイ（GCP Cloud Run）
-優先度は低く、ビルドして実行するまでは検証済みではない。各サービスは、自分のフォルダ（`Dockerfile` と `cloudbuild.yaml` がある）からビルドする。
+優先度は低い。2026-11-01 に手動で一度ビルドしてデプロイした。デプロイ先での書き手のシナリオは実行していない。各サービスは、自分のフォルダ（`Dockerfile` と `cloudbuild.yaml` がある）からビルドする。
 
 ```bash
 gcloud builds submit backend --config backend/cloudbuild.yaml

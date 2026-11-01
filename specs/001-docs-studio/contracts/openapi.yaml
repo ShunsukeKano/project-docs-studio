@@ -86,6 +86,7 @@ paths:
               schema: {$ref: '#/components/schemas/ArticleDetail'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
     patch:
       tags: [writer]
       operationId: updateArticle
@@ -157,6 +158,7 @@ paths:
               schema: {$ref: '#/components/schemas/ArticleDetail'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
         '409': {$ref: '#/components/responses/NotPublished'}
   /articles/{id}/versions:
     parameters:
@@ -176,6 +178,7 @@ paths:
                 items: {$ref: '#/components/schemas/VersionSummary'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
   /articles/{id}/versions/{n}:
     parameters:
       - {$ref: '#/components/parameters/ArticleId'}
@@ -193,6 +196,7 @@ paths:
               schema: {$ref: '#/components/schemas/VersionDetail'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
     delete:
       tags: [writer]
       operationId: deleteVersion
@@ -204,6 +208,7 @@ paths:
           description: Deleted. The number is never reused.
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationError'}
         '409': {$ref: '#/components/responses/VersionIsLive'}
   /articles/{id}/versions/{n}/restore:
     parameters:
@@ -269,6 +274,62 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/PublicArticle'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /ai/status:
+    get:
+      tags: [writer]
+      operationId: getAiStatus
+      summary: Is AI drafting switched on? (optional extra, amendment A-7)
+      description: Lets the screen hide the AI control when the feature is off. Touches no database and calls no model.
+      security: [{basicAuth: []}]
+      responses:
+        '200':
+          description: Whether AI drafting is on.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /ai/draft:
+    post:
+      tags: [writer]
+      operationId: generateDraft
+      summary: Stream a proposed body from the writer's title, tags and notes (optional extra, amendments A-7 and A-9)
+      description: |
+        Returns a **proposal only**. It creates, changes, saves and publishes nothing. Off by default (503 `ai_disabled`).
+        The title is 1 to 200 characters, there are up to 10 tags, the notes (the text already in the body) are up to 5,000 characters and the instructions up to 1,000. Requests are limited per minute (429 `rate_limited`
+        with `Retry-After`). A failed, refused or unusable model reply is a generic 502 `ai_unavailable` with no internal detail.
+      security: [{basicAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AiDraftRequest'}
+      responses:
+        '200':
+          description: |
+            A stream of server-sent events (`text/event-stream`). Each event is a line `data: {json}` followed by a blank line:
+            `{"type":"delta","text":"..."}` carries a piece of the Markdown body, `{"type":"done"}` ends the stream, and
+            `{"type":"error","code":"ai_unavailable","message":"..."}` reports a failure that happens after streaming has started.
+            Failures before the first piece use the normal status codes below.
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '429':
+          description: Too many requests (code `rate_limited`). `Retry-After` says how many seconds to wait.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '502':
+          description: The draft could not be made (code `ai_unavailable`).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '503':
+          description: AI drafting is switched off (code `ai_disabled`).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
   /healthz:
     get:
       tags: [health]
@@ -365,7 +426,7 @@ components:
           properties:
             code:
               type: string
-              enum: [unauthorized, not_found, validation_error, version_conflict, empty_content, not_published, version_is_live, slug_conflict]
+              enum: [unauthorized, not_found, validation_error, version_conflict, empty_content, not_published, version_is_live, slug_conflict, ai_disabled, ai_unavailable, rate_limited]
             message: {type: string}
             details:
               description: "Extra data. For `version_conflict`, an object with `current_draft_version` (an integer); for `validation_error`, the list of field problems."
@@ -496,3 +557,17 @@ components:
         body: {type: string, description: Markdown. Rendered and sanitized by the frontend.}
         published_at: {type: string, format: date-time}
         live_created_at: {type: string, format: date-time}
+    AiStatus:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: {type: boolean}
+    AiDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: {$ref: '#/components/schemas/Title'}
+        tags: {$ref: '#/components/schemas/Tags'}
+        notes: {type: string, maxLength: 5000}
+        instructions: {type: [string, 'null'], maxLength: 1000}

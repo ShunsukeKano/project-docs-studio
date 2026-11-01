@@ -274,7 +274,7 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Hiragino S
 <h3>5.1 Server Action 経由の Basic 認証</h3>
 <ul>
   <li>Server Action はサーバーで動き、自分では <code>Authorization</code> ヘッダーを持たない。受け取ったヘッダーを <code>headers().get("authorization")</code> で読み、API を呼ぶたびに渡す。API クライアントは、ヘッダーを呼び出しごとに受け取り、モジュールのシングルトンには持たせない。</li>
-  <li>検証するのは FastAPI だけ。<code>proxy.ts</code> は、<code>/studio/**</code> のすべてのリクエスト（action の POST を含む）でヘッダーがあるかを確認するだけで、検証はできない。</li>
+  <li>検証するのは FastAPI だけ。<code>proxy.ts</code> は、<code>/studio/**</code> のすべてのリクエスト（action の POST を含む）でヘッダーがあるかを確認するだけで、検証はできない。ヘッダーがないときは、リクエストされたアドレスそのものに <code>401</code> と <code>WWW-Authenticate</code> を返す。別のパスへリダイレクトするとループするため（ブラウザは保存した認証情報を、チャレンジされたパスにしか送らない）。</li>
   <li>API が 401 を返したら、action はそれを呼び出し元に伝え、ページは <code>/auth/challenge</code> にリダイレクトする。これは route handler で、<code>WWW-Authenticate: Basic realm="studio"</code> つきの <code>401</code> を返す。Server Action は、そのレスポンスヘッダーを自分では設定できない。</li>
   <li>ブラウザは Basic 認証の認証情報を、realm とパスごとに覚える。ログアウトはなく、この範囲では許容する。</li>
 </ul>

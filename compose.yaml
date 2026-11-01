@@ -1,0 +1,105 @@
+# Local run for Docs Studio. From a fresh checkout, with only Docker installed:
+#
+#   cp .env.example .env
+#   docker compose up --build          # database, schema, API (8000) and web app (3000)
+#   docker compose --profile test run --rm test    # the backend tests, one command
+#
+# The values below come from .env. The passwords are local-only placeholders; never commit a real one.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}
+      POSTGRES_DB: docs_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docs_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The test database. Its name ends in _test, which the test suite's guard requires.
+  # tmpfs keeps it fast and means nothing persists between runs.
+  db-test:
+    image: postgres:17
+    profiles: ["test"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}
+      POSTGRES_DB: docs_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docs_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Applies the schema once, then exits. The API starts only after it succeeds.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/docs_dev
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    environment:
+      ENV: local
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/docs_dev
+      BASIC_AUTH_ENABLED: ${BASIC_AUTH_ENABLED:-false}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as r; r.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_BASE_URL: http://backend:8000
+      BASIC_AUTH_ENABLED: ${BASIC_AUTH_ENABLED:-false}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # The backend tests against db-test, inside a container: `docker compose --profile test run --rm test`
+  test:
+    build:
+      context: ./backend
+      target: test
+    profiles: ["test"]
+    environment:
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db-test:5432/docs_test
+      # The guard accepts only localhost unless a host is named here; the name rule still applies.
+      TEST_DATABASE_EXTRA_HOSTS: db-test
+      CONTRACT_PATH: /specs/001-docs-studio/contracts/openapi.yaml
+    volumes:
+      - ./specs:/specs:ro
+    depends_on:
+      db-test:
+        condition: service_healthy
+
+volumes:
+  pgdata:

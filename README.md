@@ -20,7 +20,7 @@ Things worth trying: publish an article, edit the draft and check the public pag
 
 The idea that shapes the design: **a writer can edit freely without ever changing what readers see, and what readers see is always a frozen snapshot of what was last published.** A draft and published content never share a row; every publish creates an immutable, numbered snapshot inside one atomic transaction.
 
-> **Status: the backend, the web app, the local Docker run and the Cloud Run deployment are built and working.** 364 backend tests (on a real PostgreSQL) and 29 frontend tests pass with `make test`, and the same backend suite passes inside Docker with `docker compose --profile test run --rm test`. The writer screens were driven end to end in a real browser (headless Chrome) against the running system: create, save and publish in one step, history, Restore, delete, Unpublish, the edit-conflict screen with "Resubmit", and (with a stand-in for the model) the streamed AI draft. The deployed site was checked from outside (public pages, 404s, sign-in required for the writer area, security headers) and its owner confirmed in a browser that it runs; the quickstart scenarios themselves were run on the local Docker system. After that, the owner reported running the quickstart scenarios on the deployed site, trying the AI button against the real Claude model, seeing the browser's own sign-in box, and checking the "first article in under three minutes" goal; those four were done by the owner and are **not recorded in detail** here (no timings or transcripts). There is no CI on GitHub yet (listed under "more time"). The table at the end gives the status of every feature.
+> **Status: the backend, the web app, the local Docker run and the Cloud Run deployment are built and working.** 364 backend tests (on a real PostgreSQL) and 29 frontend tests pass with `make test`, and the same backend suite passes inside Docker with `docker compose --profile test run --rm test`. The writer screens were driven end to end in a real browser (headless Chrome) against the running system, and those flows are now kept as 21 automated Playwright tests (`make e2e`, which runs against a throwaway Docker system and is separate from `make test`): create, save and publish in one step, history, Restore, delete, Unpublish, the edit-conflict screen with "Resubmit", and (with a stand-in for the model) the streamed AI draft. The deployed site was checked from outside (public pages, 404s, sign-in required for the writer area, security headers) and its owner confirmed in a browser that it runs; the quickstart scenarios themselves were run on the local Docker system. After that, the owner reported running the quickstart scenarios on the deployed site, trying the AI button against the real Claude model, seeing the browser's own sign-in box, and checking the "first article in under three minutes" goal; those four were done by the owner and are **not recorded in detail** here (no timings or transcripts). There is no CI on GitHub yet (listed under "more time"). The table at the end gives the status of every feature.
 
 ## How the work was specified (spec first)
 
@@ -66,6 +66,14 @@ make test    # run every test (needs TEST_DATABASE_URL; the database name must e
 make test-docker   # docker compose --profile test run --rm test
 ```
 
+**Drive the screens in a real browser (optional, needs Docker and Google Chrome):**
+
+```bash
+make e2e   # 21 Playwright tests against a throwaway Docker system
+```
+
+`make e2e` builds and starts a separate system from `compose.e2e.yaml` (its own database, kept in memory, on ports 18000 and 13000; the writer login and the AI feature are off), runs the browser tests in `frontend/e2e/`, and always removes the system afterwards, so your development data is not touched. It is not part of `make test`. The AI button is only checked for its state; the tests never call the model.
+
 Configuration is by environment variables (`.env.example` lists them): `DATABASE_URL`, `TEST_DATABASE_URL`, `BASIC_AUTH_ENABLED`, `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD`, `API_BASE_URL`. `DATABASE_URL` can point at any PostgreSQL, for example Cloud SQL through the Cloud SQL Auth Proxy. Tests refuse to run unless the database name ends in `_test` and the host is local (the Compose test container names its `db-test` host explicitly).
 
 ## Data model
@@ -107,7 +115,7 @@ The photo in the web app (the public list banner) is from Unsplash, which licens
 - Rate limiting on the sign-in challenge, and an audit log of who published or deleted what.
 - Real pagination (cursor-based) and a search over published articles.
 - A cache for public pages with explicit invalidation on publish and unpublish, once the 404 requirement can be proven to hold with it.
-- Try the AI draft helper against the real model and tune its prompt (it was checked only with a local stand-in; see "Optional extras" below).
+- Tune the AI draft helper's prompt and measure its cost on real articles (it works against the real model on the deployed site, as reported by the owner; see "Optional extras" below).
 - CI that runs the tests and the spec-first check, and infrastructure as code for Cloud Run and Cloud SQL.
 
 ## Features and their status
@@ -129,7 +137,6 @@ Status values: **Done**, **Partial**, **Not done**. *Done* means built and cover
 | Automated tests for every invariant (INV-1 to INV-6) | Done | n/a |
 | Local run with Docker Compose (`docker compose up --build`) | Done | n/a |
 | Cloud Run deployment (with automatic deploys from GitHub) | Done (the owner ran the writer scenarios on it) | Build with `cloudbuild.yaml`; create Cloud SQL, Artifact Registry, Secret Manager and the service accounts by hand (Phase 12, low priority) |
-| AI draft generation | Not done: excluded from the plan | See "Improvements with more time" above |
 
 ## Repository layout
 

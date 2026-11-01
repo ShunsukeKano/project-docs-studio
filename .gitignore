@@ -14,3 +14,7 @@ node_modules/
 
 # Personal Claude Code settings
 .claude/settings.local.json
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

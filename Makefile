@@ -8,13 +8,14 @@ endif
 
 COMPOSE ?= docker compose
 
-.PHONY: help setup dev test test-docker check-api check-spec-first db-up db-down
+.PHONY: help setup dev test test-docker e2e check-api check-spec-first db-up db-down
 
 help:
 	@echo "make setup            install dependencies, start the Compose databases, apply the schema"
 	@echo "make dev              start the API (and the web app once it exists)"
 	@echo "make test             run every test (needs TEST_DATABASE_URL, a local database ending in _test)"
 	@echo "make test-docker      run the backend tests in a container (needs only Docker)"
+	@echo "make e2e             drive the screens in a real browser against a throwaway Docker system (needs Docker and Chrome)"
 	@echo "make check-api        regenerate openapi.json and the frontend types; fail on any difference"
 	@echo "make check-spec-first verify spec.md was committed before any backend/ or frontend/ file"
 
@@ -69,6 +70,11 @@ test:
 # Runs the backend tests inside a container, so a machine with only Docker can run them.
 test-docker:
 	$(COMPOSE) --profile test run --rm test
+
+# Real-browser tests of the screens. They start a separate, throwaway system (compose.e2e.yaml) and remove it afterwards,
+# so no development data is touched. Not part of `make test`.
+e2e:
+	./scripts/e2e.sh
 
 # Regenerate openapi.json (no database needed) and the frontend types, then fail on any difference.
 check-api:

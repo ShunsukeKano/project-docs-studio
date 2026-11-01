@@ -106,7 +106,7 @@ Phase 0 output of `/speckit-plan`. Each entry records the **decision**, the **ra
 
 ## R-18 Explicitly excluded
 
-- **AI draft generation (FR-17 in `docs/requirements.md`)**: excluded. If it is ever built, it uses the Claude API with prepaid credit, so the spend cannot exceed the deposited amount; it returns a proposal and never writes. Vertex AI was considered and rejected because it can be called without limit.
+- **AI draft generation (FR-17 in `docs/requirements.md`)**: excluded from the assessed plan, then built later as an optional extra (amendment A-7 in `spec.md`). It uses the Claude API with prepaid credit, so the spend cannot exceed the deposited amount; it returns a proposal and never writes. Vertex AI was considered and rejected because it can be called without limit.
 - **Save as Version, Diff View**: not adopted.
 - **Any caching layer**: not built (R-08).
 

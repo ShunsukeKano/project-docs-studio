@@ -16,4 +16,5 @@ Next.js 16（App Router）、TypeScript の strict モード、pnpm。
 - スタイルは Tailwind CSS だけを使う（コンポーネントライブラリは使わない）: ミニマルでスタイリッシュにし、落ち着いた配色、アクセントの色は1色、システムフォント、ゆったりした余白、見えるキーボードフォーカス、レスポンシブなレイアウトにする。機能とそのテストが済んだあとの、時間を区切った仕上げで、見た目は評価されない。
 - Markdown は、共通の1つのレンダラーとサニタイザー（`src/lib/markdown.ts`）で描画し、公開ページと書き手のプレビューの両方で使う。
 - `Dockerfile` には、`next.config.ts` の `output: "standalone"` が要る。
+- 実ブラウザのテストは `e2e/`（Playwright、`playwright.config.ts`）にある。リポジトリのルートから `make e2e` で実行し、使い捨てのシステムを起動して、終わると削除する（Docker と Chrome が要る）。`pnpm test`（Vitest は `tests/` だけを実行する）や `make test` には含まれない。各テストは、一意のスラッグで、API 経由で自分のデータを作り、「Generate with AI」は押さない（そのシステムでは AI の機能はオフ）。
 - `Dockerfile` と `cloudbuild.yaml` はこのフォルダにある。Google Cloud では、`main` への push で、この `Dockerfile` が自動でビルドされる（Cloud Run のコンソールで作った Cloud Build トリガー）。

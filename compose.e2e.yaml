@@ -1,0 +1,51 @@
+# A throwaway system for the browser tests (`make e2e`): its own database (kept in memory), its own
+# ports (18000 and 13000), the writer login off and the AI extra forced off, so a test can never
+# touch the development data or the real model. It is started and removed by scripts/e2e.sh.
+# The database password comes from .env, like the main compose.yaml.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}
+      POSTGRES_DB: docs_e2e
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docs_e2e"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/docs_e2e
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    environment:
+      ENV: local
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/docs_e2e
+      BASIC_AUTH_ENABLED: "false"
+      AI_ENABLED: "false"
+      ANTHROPIC_API_KEY: ""
+    ports:
+      - "18000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_BASE_URL: http://backend:8000
+      BASIC_AUTH_ENABLED: "false"
+    ports:
+      - "13000:3000"
+    depends_on:
+      - backend

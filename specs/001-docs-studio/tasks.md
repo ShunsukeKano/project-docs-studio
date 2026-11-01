@@ -305,6 +305,8 @@ Nothing under `backend/` or `frontend/` (except their `CLAUDE.md`) is committed 
 - [X] T108 (A-8) Make the preview follow the text with `useDeferredValue` in `editor-form.tsx` and `new-article-form.tsx`
 - [X] T109 (A-7) Update `quickstart.md` (scenario 12, a manual step that needs a key), `README.md`, and check the Constitution Check in `plan.md`
 - [X] T110 (A-9) Stream the AI body: server-sent events from `POST /ai/draft` (`backend/src/app/api/v1/routes/ai.py`, `domains/ai/generator.py`), the pass-through route handler `frontend/src/app/(studio)/studio/ai-draft/route.ts`, and the reading and Stop logic in `ai-generate-bar.tsx`; tests first (several pieces arrive, a failure before the first piece is a normal error, a failure in the middle is an `error` event), contract and quickstart updated
+- [X] T111 Real-browser tests of the screens with Playwright (`frontend/e2e/`, `frontend/playwright.config.ts`): new article (nothing created until the first save, slug behaviour, Save draft, Save & publish and a second edit), history (Live badge, View, Restore, delete with confirmation, Unpublish and Publish), the edit-conflict screen with Resubmit, the public list, detail and uniform 404, no request to another site, Body and Preview height, and the AI button state (never clicked: the AI feature is off in the test system)
+- [X] T112 `compose.e2e.yaml` and `scripts/e2e.sh`, run with `make e2e`: a throwaway system (own database in tmpfs, API on 18000, web app on 13000, writer login and AI off) started before the tests and always removed afterwards, so no development data is touched; not part of `make test`
 
 ---
 
@@ -376,5 +378,5 @@ Stop adding features. Finish the invariants and their tests (Phases 3 to 10), th
 
 - [P] tasks touch different files and have no dependency on unfinished work.
 - Every story is independently testable at its checkpoint.
-- Excluded on purpose: AI draft generation, Save as Version, Diff View and any caching layer. No task here builds them.
+- Excluded on purpose: Save as Version, Diff View and any caching layer. No task here builds them. (AI draft generation was excluded at first and added later as an optional extra: see amendment A-7 in `spec.md`.)
 - Commit in the order given in "Commit order" above; never rewrite history.

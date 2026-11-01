@@ -20,7 +20,7 @@ Out of this plan, on purpose: AI draft generation (built later as an optional ex
 
 **Storage**: PostgreSQL. Production on Cloud SQL. Local runs use PostgreSQL 17 started by Docker Compose (`db` for development, `db-test` for tests), or Cloud SQL through the Auth Proxy; the target is chosen by `DATABASE_URL` and `TEST_DATABASE_URL`, and development, test and production databases are separate. The DDL is the numbered SQL in `backend/db-automation-apply/` (source of truth).
 
-**Testing**: pytest with pytest-asyncio and httpx (`ASGITransport`) against a real PostgreSQL `_test` database (no database mocks); Vitest for the shared Markdown sanitizer; `tsc --noEmit` and ESLint for the frontend. One command, `make test`, runs everything including the OpenAPI drift check.
+**Testing**: pytest with pytest-asyncio and httpx (`ASGITransport`) against a real PostgreSQL `_test` database (no database mocks); Vitest for the shared Markdown sanitizer; `tsc --noEmit` and ESLint for the frontend; Playwright real-browser tests of the screens (`make e2e`, against a throwaway Docker system, run separately from `make test`). One command, `make test`, runs everything including the OpenAPI drift check.
 
 **Target Platform**: Docker Compose for the local run (only Docker is needed on the machine); Linux containers on GCP Cloud Run for deployment (low priority and not verified); developed on macOS or Linux.
 
@@ -126,7 +126,8 @@ frontend/
 │       ├── api/server-client.ts # per-call Authorization header
 │       ├── markdown.ts          # one renderer + sanitizer, used by preview and public page
 │       └── env.ts               # validated lazily
-└── tests/                       # Vitest: markdown.ts, format.ts
+├── tests/                       # Vitest: markdown.ts, format.ts
+└── e2e/                         # Playwright real-browser tests (make e2e)
 
 Dockerfile / cloudbuild.yaml     # in backend/ and frontend/ (the Dockerfiles are built by Docker Compose; cloudbuild.yaml is low priority, drafted, not verified)
 ```

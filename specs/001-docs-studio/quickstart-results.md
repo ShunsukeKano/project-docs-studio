@@ -100,6 +100,6 @@ Both services run on Cloud Run (automatic deploys from GitHub). The author check
 ## What this run did not cover
 
 - **Two real tabs for scenario 7.** The conflict screen was driven in one browser page while the "other writer" saved through the API, which is the same server-side situation; two separate tabs were not used.
-- **Scenario 9 in a browser.** The web app was checked to answer `/studio` with 401 and `WWW-Authenticate` when the login is on; the sign-in prompt was not observed in a browser.
-- **SC-009 (first article published in under 3 minutes by hand)** was not timed.
-- **The deployed site (Cloud Run).** It has not been built or deployed; nothing here describes it.
+- **Scenario 9 in a browser (author).** The web app was checked to answer `/studio` with 401 and `WWW-Authenticate` when the login is on; the author did not observe the sign-in prompt. The owner reports seeing it on the deployed site.
+- **SC-009 (first article published in under 3 minutes by hand)** was not timed by the author. The owner reports that this goal is met on the deployed site (not recorded in detail).
+- **The deployed site (Cloud Run).** The scenario results above are from the local run. The deployed site is described only in the section "The deployed site (reported by the owner)".

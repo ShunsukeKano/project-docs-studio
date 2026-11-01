@@ -75,9 +75,31 @@ Run with a **local stand-in for the model** (a small server answering `/v1/messa
 
 **Not run**: a call to the real model. It needs a key and costs a few cents, so it is a manual step (`quickstart.md`, scenario 12). The request shape and the stream handling were checked against the SDK itself and the model's documented rules, not against the live service.
 
+## Writer screens in a real browser (headless Chrome, local Docker system, writer login off)
+
+An article with versions 1 and 2 was set up through the API, then the screens were driven by script (clicks and typing in the real page). This covers the screen side of scenarios 5, 6, 7 and 4.
+
+| Step | Expected | Observed | Result |
+|---|---|---|---|
+| History panel | version 2 marked Live, version 1 listed | as expected | pass |
+| Delete on the live version | the button is disabled | disabled | pass |
+| View version 1 | its full text is shown | shown | pass |
+| Restore version 1 | the draft holds version 1's text; status and live version unchanged; the public page still shows version 2 | all as expected | pass |
+| Another writer saves first, then this tab saves | the screen says the server copy changed; my unsent text stays in the form; the server copy is not overwritten | all as expected | pass |
+| "Resubmit mine against the new version" | my text is saved; the conflict message goes away | saved; message gone | pass |
+| Delete version 1 (confirm accepted) | version 1 is gone, the live version 2 remains | as expected | pass |
+| Unpublish | status unpublished, history kept, public page 404, the Unpublish button disabled | as expected | pass |
+| Publish again | version 3 goes live | live version 3 | pass |
+
+18 of 18 checks passed.
+
+## The deployed site (reported by the owner)
+
+Both services run on Cloud Run (automatic deploys from GitHub). The author checked the public side from outside (public list, 404s, 401 for the writer area and the API, security headers, API to database). The owner, who holds the writer credentials, then reported that they ran the quickstart scenarios on the deployed site, tried the AI button against the real Claude model, saw the browser's own sign-in box, and checked the first-article-in-under-three-minutes goal (SC-009). These four were done by the owner and are not recorded in detail (no timings or transcripts), so they are listed here as reported, not as measured by the author.
+
 ## What this run did not cover
 
-- **The conflict screen in a browser.** Scenario 7 asks for two browser tabs and the conflict screen (keep the typed input, "reload latest" or "resubmit"). The HTTP behaviour behind it is verified above, but that screen was not driven in a real browser. Scenario 11 was.
+- **Two real tabs for scenario 7.** The conflict screen was driven in one browser page while the "other writer" saved through the API, which is the same server-side situation; two separate tabs were not used.
 - **Scenario 9 in a browser.** The web app was checked to answer `/studio` with 401 and `WWW-Authenticate` when the login is on; the sign-in prompt was not observed in a browser.
 - **SC-009 (first article published in under 3 minutes by hand)** was not timed.
 - **The deployed site (Cloud Run).** It has not been built or deployed; nothing here describes it.

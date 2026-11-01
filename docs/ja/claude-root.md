@@ -55,3 +55,5 @@
 gcloud builds submit backend --config backend/cloudbuild.yaml
 gcloud builds submit frontend --config frontend/cloudbuild.yaml
 ```
+
+これは手動のビルド。稼働中のサービスは、自動でも再デプロイされる。Cloud Run のコンソールで作った2つの Cloud Build トリガーが、`main` への push のたびに、`backend/Dockerfile` と `frontend/Dockerfile` をビルドしてイメージを差し替え、各サービスの設定とシークレットは保持される。マイグレーション Job は実行しないので、スキーマを変えたあとは、`gcloud run jobs execute docs-studio-api-migrate --region asia-northeast1` を実行する。シークレット（`database-url`、`basic-auth-user`、`basic-auth-password`、`anthropic-api-key`）は Secret Manager に置き、このリポジトリのどのファイルにも書かない。Cloud SQL は、動いている間、費用がかかる。作業が終わったら、停止（`--activation-policy=NEVER`）するか、削除する。Google Cloud に変更を加えるときは、先に所有者の確認を取る。

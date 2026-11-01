@@ -53,3 +53,5 @@ Low priority. It was built and deployed once by hand (2026-11-01); the writer sc
 gcloud builds submit backend --config backend/cloudbuild.yaml
 gcloud builds submit frontend --config frontend/cloudbuild.yaml
 ```
+
+That is the manual build. The live services are also redeployed automatically: two Cloud Build triggers (made in the Cloud Run console) build `backend/Dockerfile` and `frontend/Dockerfile` on every push to `main` and swap the image, keeping each service's settings and secrets. They do not run the migration Job: after a schema change, run `gcloud run jobs execute docs-studio-api-migrate --region asia-northeast1`. Secrets (`database-url`, `basic-auth-user`, `basic-auth-password`, `anthropic-api-key`) live in Secret Manager and are never written in a file in this repository. Cloud SQL costs money while it runs: stop it (`--activation-policy=NEVER`) or delete it when the work is over. Any change to Google Cloud needs the owner's confirmation first.

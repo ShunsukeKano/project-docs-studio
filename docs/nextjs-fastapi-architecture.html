@@ -203,28 +203,27 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <div>
 <h3>Folders</h3>
 <pre class="tree">backend/
-├─ pyproject.toml / uv.lock
+├─ pyproject.toml / uv.lock / alembic.ini
 ├─ db-automation-apply/ … the DDL (001_schema.sql)
-├─ alembic/ ………… migrations
-├─ openapi.json …… the contract shared with the frontend
+├─ alembic/ ………… migrations (versions/0001_schema.py runs the DDL file)
+├─ openapi.json …… the contract shared with the frontend (generated)
 ├─ scripts/export_openapi.py (needs no database)
 ├─ src/app/
-│  ├─ main.py ………… create_app()
-│  ├─ core/ ………… config, security, exceptions
-│  ├─ db/ ………… base, session
-│  ├─ api/
-│  │  ├─ deps.py
-│  │  └─ v1/routes/ … articles (writer), public
+│  ├─ main.py ………… create_app(), logging, request ID, OpenAPI tidy-up
+│  ├─ core/ ………… config.py, errors.py, security.py
+│  ├─ db/ ………… session.py
+│  ├─ api/v1/routes/ … articles.py (writer), public.py, ai.py (optional extra)
 │  └─ domains/
-│     └─ articles/
-│        ├─ models.py
-│        ├─ schemas.py
-│        ├─ repository.py (thin)
-│        └─ service.py
+│     ├─ articles/
+│     │  ├─ models.py
+│     │  ├─ schemas.py
+│     │  ├─ repository.py (thin)
+│     │  └─ service.py
+│     └─ ai/ …… optional extra: generator.py (Claude, streamed), limiter.py, schemas.py
 └─ tests/ ………… kept outside src
-   ├─ unit/ ……… rules that need no database
+   ├─ unit/ ……… rules that need no database (test-database guard, validation, AI generator)
    ├─ integration/ … real _test PostgreSQL: concurrency, crash injection, triggers
-   └─ api/ ………… auth matrix, status codes, route sweep</pre>
+   └─ api/ ………… auth matrix, check order, status codes, route sweep, contract, AI</pre>
 <p class="cap">The specification lives in <code>specs/001-docs-studio/</code> at the repository root, not inside a project folder.</p>
 </div>
 </div>
@@ -241,7 +240,7 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <tr><th>Need</th><th>Mechanism</th></tr>
 <tr><td>Showing lists and details</td><td>Server Component (dynamic, never cached)</td></tr>
 <tr><td>Writes such as create, edit and publish</td><td>Server Action</td></tr>
-<tr><td>Asking an unauthenticated writer to sign in</td><td>proxy.ts checks that the header is present; a route handler returns the 401 challenge</td></tr>
+<tr><td>Asking an unauthenticated writer to sign in</td><td>proxy.ts answers 401 when the header is missing; <code>/auth/challenge</code> checks the credentials with the API and asks again if they are wrong</td></tr>
 <tr><td>The editor form and preview</td><td>Client Component (the form only)</td></tr>
 </table></div>
 <p class="cap">Reads finish on the server, keeping the JavaScript sent to the browser to a minimum.</p>
@@ -250,22 +249,27 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <h3>Folders</h3>
 <pre class="tree">frontend/
 ├─ package.json / pnpm-lock.yaml
-├─ public/ ………… (keep a .gitkeep so the Docker COPY works)
+├─ public/ ………… the app's own images (nothing is loaded from other sites)
 └─ src/
-   ├─ proxy.ts
+   ├─ proxy.ts ……… answers the sign-in challenge on /studio
    ├─ app/
    │  ├─ (public)/docs/[slug]/page.tsx
    │  ├─ (public)/docs/page.tsx
    │  ├─ (studio)/studio/
-   │  │  ├─ page.tsx ………… article list
+   │  │  ├─ page.tsx ………… article list + "New article"
+   │  │  ├─ new/page.tsx …… write a new article directly
    │  │  ├─ [id]/page.tsx … edit + history
+   │  │  ├─ ai-draft/route.ts … passes the AI stream through (optional extra)
    │  │  └─ actions.ts …… Server Actions
-   │  └─ auth/challenge/route.ts … returns 401 + WWW-Authenticate
-   ├─ features/articles/ … screen parts
+   │  ├─ auth/challenge/route.ts … checks the credentials with the API: 401 or back to /studio
+   │  └─ icon.svg
+   ├─ features/articles/ … editor, new-article form, AI button, history, conflict view
    ├─ components/ui/
    └─ lib/
       ├─ api/generated/ … auto-generated
-      ├─ api/server-client.ts
+      ├─ api/server-client.ts, problem.ts
+      ├─ ai-stream.ts …… reads the server-sent stream in the browser
+      ├─ format.ts ……… slug, tags, dates
       ├─ markdown.ts ……… shared renderer + sanitizer
       └─ env.ts ………… validated lazily</pre>
 </div>
@@ -275,7 +279,7 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <ul>
   <li>A Server Action runs on the server and has no <code>Authorization</code> header of its own. It reads the incoming header with <code>headers().get("authorization")</code> and passes it to the API on every call; the API client takes the header per call, never from a module-level singleton.</li>
   <li>FastAPI is the only validator. <code>proxy.ts</code> only checks that the header is present on every <code>/studio/**</code> request (including action POSTs); it cannot validate. When the header is missing it answers <code>401</code> with <code>WWW-Authenticate</code> on the requested address itself, because a redirect to another path would loop (browsers send saved credentials only to the path that challenged them).</li>
-  <li>When the API answers 401, the action surfaces it, and the page redirects to <code>/auth/challenge</code>, a route handler that returns <code>401</code> with <code>WWW-Authenticate: Basic realm="studio"</code>. A Server Action cannot set that response header itself.</li>
+  <li>When the API answers 401, the page redirects to <code>/auth/challenge</code>, a route handler that checks the credentials with the API: if the API accepts them it sends the writer back to <code>/studio</code>; otherwise it answers <code>401</code> with <code>WWW-Authenticate: Basic realm="studio"</code>, so the browser asks again. Without that check, a wrong password would loop between the two addresses for ever (the browser stops it with "Throttling navigation" and shows a blank page). A Server Action cannot set that response header itself.</li>
   <li>Browsers cache Basic credentials per realm and path; there is no logout, which is accepted for this scope.</li>
 </ul>
 
@@ -809,7 +813,8 @@ DELETE FROM article_versions
 <tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}/versions/{n}</code></td><td>Full content of one version</td><td>200</td><td>404</td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/versions/{n}/restore</code></td><td>Copy the version into the draft (body: <code>expected_draft_version</code>; does not publish)</td><td>200</td><td>404, 409 <code>version_conflict</code></td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>DELETE /articles/{id}/versions/{n}</code></td><td>Delete a version (no version check)</td><td>204</td><td>404, 409 <code>version_is_live</code></td></tr>
-<tr><td><span class="tag be">Writer</span></td><td><code>POST /ai/draft</code> <em>(excluded; only if time remains, R15)</em></td><td>Generate a proposal (title, body, tags) from a topic with the Claude API. Writes nothing</td><td>200</td><td>422, 503 <code>ai_unavailable</code> (also when the prepaid credit is used up), 504 <code>ai_timeout</code>; the route does not exist unless <code>AI_ENABLED</code> is set</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>GET /ai/status</code> <em>(optional extra)</em></td><td>Is the AI extra on? (The screen shows its button either way.)</td><td>200</td><td>401</td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /ai/draft</code> <em>(optional extra, R15)</em></td><td>From the title, tags, notes and instructions, stream a proposed body as server-sent events (<code>delta</code>, then <code>done</code> or <code>error</code>). Writes nothing</td><td>200 (a stream)</td><td>401, 422, 429 <code>rate_limited</code>, 502 <code>ai_unavailable</code>, 503 <code>ai_disabled</code></td></tr>
 <tr><td><span class="tag fe">Public</span></td><td><code>GET /public/articles?limit=&amp;offset=</code></td><td>Published list: slug, title, tags, <code>published_at</code>, updated date (only if republished); at most 100</td><td>200 (<code>[]</code> when empty)</td><td>—</td></tr>
 <tr><td><span class="tag fe">Public</span></td><td><code>GET /public/articles/{slug}</code></td><td>Title, tags and body of the live snapshot, from <b>one</b> JOIN</td><td>200</td><td>404 (never published, unpublished, missing or malformed slug: same body)</td></tr>
 <tr><td><span class="tag fe">Public</span></td><td><code>GET /healthz</code></td><td>Liveness; does not touch the database</td><td>200</td><td>—</td></tr>
@@ -873,8 +878,8 @@ DELETE FROM article_versions
 <div class="scroll"><table>
 <tr><th>File</th><th>Location</th><th>Role</th></tr>
 <tr><td><code>compose.yaml</code></td><td>repository root</td><td>Local run: PostgreSQL 17 for development (<code>db</code>) and tests (<code>db-test</code>), plus <code>migrate</code>, <code>backend</code> and <code>frontend</code> built from the Dockerfiles, so <code>docker compose up --build</code> runs everything. Part of the short setup command, so not low priority</td></tr>
-<tr><td><code>cloudbuild.yaml</code></td><td>backend</td><td>Build the image → push to Artifact Registry → run the migration Job → deploy to Cloud Run (api)</td></tr>
-<tr><td><code>cloudbuild.yaml</code></td><td>frontend</td><td>Build the image → push → deploy to Cloud Run (web). Passes <code>API_BASE_URL</code> as an environment variable</td></tr>
+<tr><td><code>cloudbuild.yaml</code></td><td>backend</td><td>Build the image (the <code>run</code> stage) → push to Artifact Registry → run the migration Job → deploy to Cloud Run (api). Run once by hand; the automatic deploy from GitHub does not use this file</td></tr>
+<tr><td><code>cloudbuild.yaml</code></td><td>frontend</td><td>Build the image → push → deploy to Cloud Run (web). Passes <code>API_BASE_URL</code> as an environment variable. Run once by hand; the automatic deploy from GitHub does not use this file</td></tr>
 </table></div>
 <p class="cap">Each project also has a <code>Dockerfile</code> and <code>.dockerignore</code> at its root (backend: python:3.12-slim + uv; frontend: a three-stage node:22-slim build). Docker Compose builds the same Dockerfiles for the local run, and Cloud Build builds them for Cloud Run. Both run as a non-root user. They have not been built or run yet (that needs <code>pyproject.toml</code> and <code>package.json</code>), so they must not be described as verified. The frontend Dockerfile also needs <code>output: "standalone"</code> in <code>next.config.ts</code>, and a <code>public/.gitkeep</code> so its <code>COPY</code> works.</p>
 
@@ -887,6 +892,7 @@ DELETE FROM article_versions
   <div class="n fe">Deploy web</div>
 </div>
 <p>The order is <b>migration → api → web</b>. If changes stay backward compatible (add → migrate → remove), things keep working even if a deployment stops partway.</p>
+<p><b>Automatic deploys (as done):</b> two Cloud Build triggers, made in the Cloud Run console for the GitHub repository, build <code>backend/Dockerfile</code> and <code>frontend/Dockerfile</code> on every push to <code>main</code> and update the two services with the new image (their settings, secrets and service accounts are kept). They do <b>not</b> run the migration Job: after a schema change, run it by hand (<code>gcloud run jobs execute docs-studio-api-migrate --region asia-northeast1</code>).</p>
 
 <h3>Differences between environments</h3>
 <div class="scroll"><table>
@@ -894,7 +900,8 @@ DELETE FROM article_versions
 <tr><td>PostgreSQL</td><td>PostgreSQL 17 in Docker Compose (<code>db</code>, <code>db-test</code>); or Cloud SQL through the Auth Proxy on <code>localhost</code></td><td>Cloud SQL for PostgreSQL (Unix socket)</td></tr>
 <tr><td><code>DATABASE_URL</code></td><td><code>postgresql+asyncpg://USER:PASS@localhost:5432/app</code> (the Compose database; through the proxy for Cloud SQL)</td><td><code>database-url</code> in Secret Manager: <code>...@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE</code></td></tr>
 <tr><td>Database name</td><td><code>&lt;name&gt;_dev</code> for development; tests use <code>&lt;name&gt;_test</code> through <code>TEST_DATABASE_URL</code></td><td>The production database (never used locally)</td></tr>
-<tr><td>Migrations</td><td><code>uv run alembic upgrade head</code></td><td>Cloud Run Job (runs automatically at deploy time)</td></tr>
+<tr><td>Migrations</td><td><code>uv run alembic upgrade head</code></td><td>Cloud Run Job (runs in the manual build; after an automatic deploy from GitHub, run it by hand when the schema changed)</td></tr>
+<tr><td>AI extra (optional)</td><td>Off by default. To try it: <code>AI_ENABLED=true</code> and your own <code>ANTHROPIC_API_KEY</code> in <code>.env</code> (Git ignores it)</td><td>Switched on for the deployed site: <code>AI_ENABLED=true</code> on the service and the key from Secret Manager (<code>anthropic-api-key</code>)</td></tr>
 <tr><td>Frontend → API</td><td><code>http://localhost:8000</code></td><td>The API's Cloud Run URL (no IAM authentication)</td></tr>
 <tr><td>Listening port</td><td>8000 / 3000</td><td>api = 8000, web = 3000 (set with <code>--port</code>)</td></tr>
 </table></div>
@@ -903,34 +910,34 @@ DELETE FROM article_versions
 <h3>Operational settings</h3>
 <div class="scroll"><table>
 <tr><th>Topic</th><th>Setting</th></tr>
-<tr><td>Limits and cost</td><td><code>--max-instances</code> on both services (for example 3); <code>--cpu-boost</code>; <code>--min-instances=0</code> (cold starts of a few seconds are accepted). Cloud SQL is the main always-on cost: stop it when idle and remove it after the assessment.</td></tr>
-<tr><td>Migration Job</td><td><code>--max-retries=0</code> and a task timeout; migrations run in an advisory lock (<code>pg_advisory_lock</code>) so two builds cannot migrate at once; only additive, backward-compatible migrations ship in the same release as the code that needs them. Rolling back means shifting traffic to the previous revision, not a down-migration.</td></tr>
-<tr><td>Cloud Build</td><td>The build identity needs <code>roles/run.admin</code>, <code>roles/iam.serviceAccountUser</code> on the runtime service account, <code>roles/artifactregistry.writer</code> and <code>roles/logging.logWriter</code>; the <code>run</code>, <code>sqladmin</code>, <code>secretmanager</code>, <code>artifactregistry</code> and <code>cloudbuild</code> APIs must be on. Use <code>--set-cloudsql-instances</code> (not <code>--add-</code>) so the set is deterministic. A first step fails fast if <code>_SQL_INSTANCE</code> or <code>_RUNTIME_SA</code> is empty. <code>--allow-unauthenticated</code> fails if an organization policy blocks <code>allUsers</code>. (To be confirmed when deploying.)</td></tr>
+<tr><td>Limits and cost</td><td><code>--max-instances=3</code> on both services; <code>--cpu-boost</code>; <code>--min-instances=0</code> (cold starts of a few seconds are accepted). Cloud SQL (<code>db-f1-micro</code>; roughly 10 to 15 US dollars a month, an estimate) is the main always-on cost: stop it when idle (<code>--activation-policy=NEVER</code>) and delete it after the assessment.</td></tr>
+<tr><td>Migration Job</td><td><code>--max-retries=0</code> and a 600 second task timeout. There is no advisory lock (a recommendation for a busier service); only additive, backward-compatible migrations should ship in the same release as the code that needs them. Rolling back means shifting traffic to the previous revision, not a down-migration. The automatic deploy from GitHub does not run the Job.</td></tr>
+<tr><td>Cloud Build</td><td>The build account (the project's default Compute service account) holds <code>roles/cloudbuild.builds.builder</code>, <code>roles/run.admin</code>, <code>roles/artifactregistry.writer</code> on the repository, <code>roles/iam.serviceAccountUser</code> on <code>api-sa</code> and <code>web-sa</code>, and the project default <code>roles/editor</code>. The <code>run</code>, <code>cloudbuild</code>, <code>artifactregistry</code>, <code>sqladmin</code> and <code>secretmanager</code> APIs are on. The manual <code>backend/cloudbuild.yaml</code> uses <code>--add-cloudsql-instances</code>, fails fast if <code>_SQL_INSTANCE</code> or <code>_RUNTIME_SA</code> is empty, and builds only the <code>run</code> stage with BuildKit (the classic builder would also build the test stage). The automatic deploy uses two triggers from the Cloud Run console (<code>docker build backend -f backend/Dockerfile</code> and the same for <code>frontend</code>, then <code>gcloud run services update --image</code>).</td></tr>
 <tr><td>Container</td><td>Backend: respect <code>$PORT</code>, run uvicorn with <code>--proxy-headers --forwarded-allow-ips='*'</code>, <code>UV_NO_CACHE=1</code>, <code>UV_PYTHON_DOWNLOADS=never</code>, pin the uv image by digest. Frontend: <code>COPY --chown=app</code> so Next can write <code>.next/cache</code>.</td></tr>
-<tr><td>Security headers</td><td>The frontend sets CSP, <code>X-Content-Type-Options</code>, <code>Referrer-Policy</code>, <code>frame-ancestors 'none'</code> and HSTS (this also backs the Markdown XSS decision, U7). No CORS middleware is installed; Basic credentials are the only protection of the writer API, so use a random password of 24 characters or more and rely on the instance cap against guessing.</td></tr>
-<tr><td>Database</td><td>Automated backups and point-in-time recovery on; deletion protection on; SSL required. A least-privilege application user is separate from the migration (owner) user; special characters in the password are URL-encoded and the secret has no trailing newline.</td></tr>
-<tr><td>Logs and health</td><td>JSON logs with <code>severity</code> and the trace from <code>X-Cloud-Trace-Context</code>, plus a request ID. <code>/healthz</code> does not touch the database and is the startup probe. Migrations never run at boot.</td></tr>
+<tr><td>Security headers</td><td>The frontend sets CSP (only its own images, scripts and connections), <code>X-Content-Type-Options</code>, <code>Referrer-Policy</code>, <code>X-Frame-Options</code> with <code>frame-ancestors 'none'</code>, and HSTS in production (this also backs the Markdown XSS decision, U7). No CORS middleware is installed. Basic credentials are the only protection of the writer API, so use a long random password; the instance cap (and, for the AI extra, a per-instance rate limit) limits abuse. The service trims whitespace around the configured login, because a secret saved through a console may end in a newline.</td></tr>
+<tr><td>Database</td><td>As built: Cloud SQL for PostgreSQL 17, <code>db-f1-micro</code>, 10 GB, one zone, <b>no automated backups and no deletion protection</b> (cheap and easy to remove; not for real data). One application user (<code>docs_app</code>) runs both the migrations and the app; its password is random, URL-safe and only in the <code>database-url</code> secret. For a real service: turn on backups, point-in-time recovery and deletion protection, require SSL, and use a separate least-privilege user for the app.</td></tr>
+<tr><td>Logs and health</td><td>JSON logs with <code>severity</code> and a request ID (<code>X-Request-ID</code>). <code>/healthz</code> does not touch the database; on Cloud Run's own address that path is reserved by Google and answers 404, so use the public list as a check there. Migrations never run at boot.</td></tr>
 </table></div>
 </details>
 
-<details class="opt"><summary>AI draft generation (excluded from the plan; only if time remains; click to open)</summary>
-<h3>AI draft generation with the Claude API (excluded; only if time remains)</h3>
-<p>The API on Cloud Run can call the Claude API. Calling a pay-as-you-go cloud service could be hit without limit and run up an unbounded bill, so the cost is capped with <b>prepaid credit</b>: only a fixed amount is deposited, and the feature simply stops working when it is used up. It is <b>excluded from the planned implementation</b> and from the assessed scope, and is added only if time remains after the core features, the invariant tests, the README and the adopted optional features are all done (section 13, R15).</p>
+<details class="opt"><summary>AI body generation (optional extra; built; click to open)</summary>
+<h3>AI body generation with the Claude API (outside the assessed scope; switched on for the deployed site)</h3>
+<p>In the editor, one button ("Generate with AI") asks Claude to write the article body from the title, tags and notes already entered. Calling a pay-as-you-go cloud service could be hit without limit and run up an unbounded bill, so the cost is capped with <b>prepaid credit</b>: only a fixed amount is deposited, and the feature simply stops working when it is used up. It was built after the core features were finished and tested, and it cannot change any invariant because it never saves or publishes anything itself.</p>
 <div class="flow">
-  <div class="n fe">Edit form: "Generate a draft" + topic</div><span class="a">→</span>
+  <div class="n fe">Button: title + tags + notes</div><span class="a">→</span>
+  <div class="n fe">Route handler <code>/studio/ai-draft</code> (passes the sign-in and the stream)</div><span class="a">→</span>
   <div class="n be">POST /ai/draft (Basic auth)</div><span class="a">→</span>
-  <div class="n">Claude API (key from Secret Manager)</div><span class="a">→</span>
-  <div class="n be">Normalize and clip the result</div><span class="a">→</span>
-  <div class="n fe">Form shows a proposal</div><span class="a">→</span>
-  <div class="n be">Writer saves with PATCH (<code>expected_draft_version</code>)</div>
+  <div class="n">Claude API (key from Secret Manager), streamed</div><span class="a">→</span>
+  <div class="n fe">The body fills in as it is written (Stop keeps what has arrived)</div><span class="a">→</span>
+  <div class="n be">Writer saves (PATCH or Save &amp; publish)</div>
 </div>
 <ul>
-  <li><b>It never writes.</b> The endpoint only returns a proposal. The text enters the draft through the normal edit, so the invariants are untouched, and nothing is published until the writer publishes.</li>
-  <li><b>Spending is capped by the prepaid credit.</b> In the Anthropic Console, keep automatic reload off and set a workspace spend limit (to be confirmed when it is built). When the credit is used up, the route returns 503 <code>ai_unavailable</code> and the rest of the site is unaffected.</li>
-  <li>The Claude client is behind a small interface (<code>DraftGenerator</code>). Tests use a fake, so <code>make test</code> needs no key and costs nothing.</li>
-  <li>Setup: store the key in Secret Manager as <code>anthropic-api-key</code> and pass it as <code>ANTHROPIC_API_KEY</code>; set <code>AI_ENABLED=true</code> and <code>ANTHROPIC_MODEL</code> (a small, inexpensive model, chosen and confirmed when it is built). The key is never written in code or logged. Cloud Run needs no extra permission for this.</li>
-  <li>Further guards: off by default; 30 second timeout; limits on input length and output tokens; a per-instance rate limit; the instance cap; the prompt text is not logged in full.</li>
-  <li>The output is treated like any other input (tags lowercased and limited to 10, title 200 characters, body 100,000) and rendered through the same sanitizer (U7), so generated text cannot inject HTML. The topic text is sent to the Claude API.</li>
+  <li><b>It never writes.</b> The operation only streams a proposal. The text enters the draft through the normal save, so the invariants are untouched, and nothing is published until the writer publishes. The writer's title and tags are never changed.</li>
+  <li><b>Streamed.</b> The model writes plain Markdown and the API forwards each piece as a server-sent event, so the text appears while it is written. Failures before the first piece are normal error responses (a status code and the usual envelope); a failure after streaming has started is an <code>error</code> event, and the text that arrived is kept.</li>
+  <li><b>Spending is capped by the prepaid credit.</b> In the Anthropic Console, keep automatic reload off and set a workspace spend limit. About 2 to 3 cents a draft at the default size.</li>
+  <li>The Claude client is behind a small interface (<code>DraftGenerator</code>). Tests use a fake, ignore any AI settings in a local <code>.env</code>, and never call the API, so <code>make test</code> needs no key and costs nothing. The owner reports trying it against the real model on the deployed site (not recorded in detail).</li>
+  <li>Setup: store the key in Secret Manager as <code>anthropic-api-key</code> and pass it to the service as <code>ANTHROPIC_API_KEY</code>; set <code>AI_ENABLED=true</code> (and <code>ANTHROPIC_MODEL</code>, default <code>claude-sonnet-4-6</code>). The key is never written in code, images or logs. The service refuses to start if AI is on without a key.</li>
+  <li>Guards: off by default; the button is always visible and is disabled with a note when the feature is off; title up to 200 characters, up to 10 tags, notes up to 5,000, instructions up to 1,000; a token cap on the output; 5 requests a minute per instance (429); generic failures (502) with no internal detail; neither the key nor the text is logged. The text you enter is sent to the Claude API.</li>
 </ul>
 </details>
 
@@ -946,26 +953,37 @@ DELETE FROM article_versions
 <h3>At a glance: what protects each invariant, and how many tests cover it</h3>
 <div class="scroll"><table>
 <tr><th>Invariant</th><th>Application rule</th><th>Database guard</th><th>Automated tests</th></tr>
-<tr><td>INV-1 Snapshots are immutable</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-2 Publish is atomic</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-3 The protected version cannot be deleted</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:110px"></span> 5</td></tr><tr><td>INV-4 Restore keeps history intact</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>INV-5 Concurrent edits are detected</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>INV-6 History survives Unpublish</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>Idempotent Publish (U8)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:66px"></span> 3</td></tr><tr><td>Slug collision handling (U15)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>AI draft generation (R15, optional)</td><td><code>test_ai_draft_returns_proposal_and_writes_nothing</code> (fake client); <code>test_ai_draft_requires_basic_auth</code>; <code>test_ai_upstream_error_or_used_up_credit_gives_503</code>; <code>test_ai_output_is_normalized_and_clipped</code>; <code>test_ai_route_absent_when_disabled</code> (<code>tests/api</code>; no test calls the Claude API)</td></tr>
-<tr><td>Public side (FR-10 to FR-12)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr><tr><td>Basic authentication (FR-13)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:88px"></span> 4</td></tr>
+<tr><td>INV-1 Snapshots are immutable</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:68px"></span> 34</td></tr>
+<tr><td>INV-2 Publish is atomic</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:32px"></span> 16</td></tr>
+<tr><td>INV-3 The protected version cannot be deleted</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:34px"></span> 17</td></tr>
+<tr><td>INV-4 Restore keeps history intact</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:18px"></span> 9</td></tr>
+<tr><td>INV-5 Concurrent edits are detected</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:72px"></span> 36</td></tr>
+<tr><td>INV-6 History survives Unpublish</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:14px"></span> 7</td></tr>
+<tr><td>Idempotent Publish (U8)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:16px"></span> 8</td></tr>
+<tr><td>Slug collision handling (U15)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='dot'>●</span></td><td><span class="bar" style="width:82px"></span> 41</td></tr>
+<tr><td>Public side (FR-10 to FR-12)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:38px"></span> 19</td></tr>
+<tr><td>Basic authentication (FR-13)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:156px"></span> 78</td></tr>
+<tr><td>AI body generation (optional extra)</td><td style="text-align:center"><span class='dot'>●</span></td><td style="text-align:center"><span class='none'>○</span></td><td><span class="bar" style="width:90px"></span> 45</td></tr>
 </table></div>
-<p class="cap">A filled dot means the rule is enforced there. Every invariant has at least one automated test, and most are guarded twice (application and database).</p>
+<p class="cap">A filled dot means the rule is enforced there. The number counts the automated tests in the files that cover it (parametrized cases count one each). Every invariant has automated tests, and most are guarded twice (application and database). Replacing the code with a deliberately broken version makes these tests fail (checked for INV-1, INV-2, INV-4, INV-5 and authentication).</p>
 
-<h3>12.1 Tests per invariant (named so they can be found)</h3>
+<h3>12.1 Tests per invariant (real names, so they can be found)</h3>
 <div class="scroll"><table>
-<tr><th>Invariant / operation</th><th>Tests (<code>tests/integration</code> unless noted)</th></tr>
-<tr><td>INV-1 snapshots are immutable</td><td><code>test_publish_creates_snapshot_from_draft</code>; <code>test_editing_draft_after_publish_leaves_snapshot_and_public_page</code>; <code>test_raw_update_on_version_rejected_by_trigger</code>; <code>test_truncate_versions_rejected</code></td></tr>
-<tr><td>INV-2 Publish is atomic</td><td><code>test_publish_rolls_back_on_failure_at_each_step</code> (parametrized over the steps; asserts no new row and unchanged <code>status</code>, pointer, <code>published_at</code>, <code>draft_version</code>, <code>last_version_number</code>); <code>test_concurrent_publish_exactly_one_201_other_409</code> (<code>asyncio.gather</code>, separate connections, no 5xx, contiguous numbers); <code>test_check_rejects_published_without_pointer_or_published_at</code>; <code>test_guard_blocks_return_to_draft_and_pointer_moving_back</code></td></tr>
-<tr><td>INV-3 the protected version cannot be deleted</td><td><code>test_delete_live_version_409</code>; <code>test_delete_after_unpublish_409</code>; <code>test_delete_old_version_after_republish_204</code>; <code>test_delete_vs_publish_race_no_5xx_no_dangling_pointer</code>; <code>test_delete_missing_version_404</code></td></tr>
-<tr><td>INV-4 Restore keeps history intact</td><td><code>test_restore_copies_only_draft_and_leaves_all_versions_identical</code> (compares every column of every row); <code>test_restore_on_unpublished_never_published_published_keeps_status_pointer_published_at</code>; <code>test_restore_missing_version_404</code></td></tr>
-<tr><td>INV-5 concurrent edits</td><td><code>test_stale_edit_409_and_nothing_changes</code>; <code>test_draft_version_increments_on_edit_restore_and_publish_only</code>; <code>test_edit_vs_restore_exactly_one_wins</code>; <code>test_publish_with_stale_expected_version_409_no_snapshot</code></td></tr>
-<tr><td>INV-6 history survives Unpublish</td><td><code>test_unpublish_keeps_snapshot_pointer_and_published_at</code>; <code>test_republish_keeps_first_published_at</code>; <code>test_unpublish_non_published_409</code></td></tr>
-<tr><td>Idempotent Publish (U8)</td><td><code>test_publish_unchanged_draft_returns_200_and_one_version</code>; <code>test_draft_equal_to_old_version_creates_new_version</code>; <code>test_publish_unchanged_after_unpublish_flips_status_only</code></td></tr>
-<tr><td>Slug collision handling (U15)</td><td><code>test_create_with_taken_slug_gets_numeric_suffix</code>; <code>test_concurrent_creates_with_same_slug_get_distinct_slugs_no_500</code>; <code>test_suffix_keeps_slug_within_100_chars</code>; <code>test_slug_cannot_be_changed_after_creation</code></td></tr>
-<tr><td>Public side (FR-10 to FR-12)</td><td><code>test_public_detail_reads_snapshot_not_draft</code>; <code>test_public_404_never_published_unpublished_missing_and_malformed_slug_identical</code>; <code>test_public_list_shape_and_order</code>; <code>test_public_schema_has_no_draft_fields</code> (<code>tests/api</code>)</td></tr>
-<tr><td>Authentication (FR-13)</td><td><code>test_every_writer_route_requires_basic_auth</code> (sweeps <code>app.routes</code>); <code>test_auth_checked_before_404_and_422</code>; <code>test_public_route_ignores_authorization_header</code>; <code>test_app_refuses_to_start_in_prod_unless_auth_enabled_with_credentials</code>; <code>test_enabled_auth_with_empty_credentials_refuses_to_start</code>; <code>test_auth_off_locally_lets_writer_routes_through_and_warns</code> (<code>tests/api</code>)</td></tr>
-<tr><td>Test safety</td><td><code>test_guard_aborts_unless_database_name_ends_in_test_and_host_is_local</code> (<code>tests/unit</code>)</td></tr>
-<tr><td>Frontend</td><td>Markdown sanitization (<code>javascript:</code> link, raw <code>&lt;script&gt;</code>); type check; lint; the generated OpenAPI types are current (<code>make check-api</code>)</td></tr>
+<tr><th>Invariant / operation</th><th>Tests (files under <code>backend/tests/</code>)</th></tr>
+<tr><td>INV-1 snapshots are immutable</td><td><code>integration/test_schema_constraints.py</code>: <code>test_update_of_a_snapshot_is_rejected</code>; <code>api/test_public_read.py</code>: <code>test_the_detail_never_shows_the_draft_even_after_it_is_edited</code>; <code>integration/test_publish_lifecycle.py</code>: <code>test_the_next_publish_creates_version_2_and_keeps_published_at</code></td></tr>
+<tr><td>INV-2 Publish is atomic</td><td><code>integration/test_publish_atomicity.py</code>: <code>test_a_first_publish_that_fails_changes_nothing</code>; <code>integration/test_publish_atomicity.py</code>: <code>test_a_republish_that_fails_changes_nothing</code>; <code>integration/test_publish_concurrency.py</code>: <code>test_exactly_one_publish_wins</code>; <code>integration/test_publish_concurrency.py</code>: <code>test_a_chain_of_racing_publishes_keeps_numbers_contiguous</code></td></tr>
+<tr><td>INV-3 the protected version cannot be deleted</td><td><code>integration/test_delete_version.py</code>: <code>test_deleting_the_live_version_returns_409_and_the_row_remains</code>; <code>integration/test_delete_version.py</code>: <code>test_it_is_still_refused_after_unpublish</code>; <code>integration/test_delete_version.py</code>: <code>test_a_foreign_key_violation_is_mapped_to_the_same_409</code>; <code>integration/test_schema_constraints.py</code>: <code>test_the_live_version_cannot_be_deleted</code>; <code>integration/test_delete_publish_race.py</code>: <code>test_no_5xx_and_the_pointer_always_points_at_a_real_snapshot</code></td></tr>
+<tr><td>INV-4 Restore keeps history intact</td><td><code>integration/test_restore.py</code>: <code>test_restore_replaces_only_the_draft_and_changes_no_snapshot_or_state</code>; <code>integration/test_restore.py</code>: <code>test_restore_does_not_publish</code></td></tr>
+<tr><td>INV-5 concurrent edits</td><td><code>integration/test_optimistic_concurrency.py</code>: <code>test_a_stale_edit_returns_409_and_does_not_overwrite_the_newer_edit</code>; <code>integration/test_optimistic_concurrency.py</code>: <code>test_an_edit_and_a_restore_with_the_same_version_give_exactly_one_success</code>; <code>integration/test_optimistic_concurrency.py</code>: <code>test_a_publish_older_than_a_committed_edit_returns_409_and_creates_no_snapshot</code></td></tr>
+<tr><td>INV-6 history survives Unpublish</td><td><code>integration/test_unpublish.py</code>: <code>test_unpublish_sets_the_status_and_changes_nothing_else</code>; <code>integration/test_unpublish.py</code>: <code>test_republishing_after_an_edit_makes_a_new_snapshot_and_keeps_published_at</code></td></tr>
+<tr><td>Idempotent Publish (U8)</td><td><code>integration/test_idempotent_publish.py</code>: <code>test_an_unchanged_draft_returns_200_and_creates_nothing</code>; <code>integration/test_idempotent_publish.py</code>: <code>test_a_draft_equal_to_an_older_version_still_creates_a_new_snapshot</code></td></tr>
+<tr><td>Slug collision handling (U15)</td><td><code>integration/test_slug_collision.py</code>: <code>test_a_taken_slug_gets_2_then_3</code>; <code>integration/test_slug_collision.py</code>: <code>test_concurrent_creates_get_different_slugs_and_never_a_500</code></td></tr>
+<tr><td>Public side (FR-10 to FR-12)</td><td><code>api/test_public_read.py</code>: <code>test_every_kind_of_miss_returns_the_same_404</code>; <code>api/test_public_allow_list.py</code>: <code>test_no_internal_or_draft_field_leaks_anywhere</code></td></tr>
+<tr><td>Authentication (FR-13)</td><td><code>api/test_auth_route_sweep.py</code>: <code>test_every_writer_route_answers_401_without_credentials</code>; <code>api/test_check_order.py</code>: <code>test_401_comes_before_404</code>; <code>api/test_production_hardening.py</code>: <code>test_prod_without_authentication_is_refused</code></td></tr>
+<tr><td>Test safety</td><td><code>unit/test_test_db_guard.py</code>: <code>test_refuses_a_name_that_does_not_end_in_test</code>; <code>unit/test_test_db_guard.py</code>: <code>test_refuses_a_host_that_is_not_local</code></td></tr>
+<tr><td>API contract</td><td><code>api/test_contract_matches_openapi.py</code>: <code>test_the_same_response_status_codes</code></td></tr>
+<tr><td>AI extra (optional)</td><td><code>api/test_ai_draft.py</code>: <code>test_the_draft_operation_answers_not_available</code>; <code>api/test_ai_draft.py</code>: <code>test_the_body_arrives_in_several_pieces_and_nothing_is_created</code>; <code>unit/test_ai_generator.py</code>: <code>test_the_request_has_no_prefill_and_no_sampling_parameters</code></td></tr>
+<tr><td>Frontend (<code>frontend/tests/</code>)</td><td><code>markdown.test.ts</code> (<code>javascript:</code> links, raw <code>&lt;script&gt;</code>); <code>format.test.ts</code> (slug, tags); <code>ai-stream.test.ts</code> (the server-sent stream); <code>auth-challenge.test.ts</code> (no redirect loop on wrong credentials); <code>no-external-assets.test.ts</code> (no outside image hosts); plus type check, lint, and the generated OpenAPI types being current (<code>make check-api</code>)</td></tr>
 </table></div>
 
 <h3>12.2 Build order (the order the tasks follow)</h3>

@@ -281,7 +281,7 @@ Nothing under `backend/` or `frontend/` (except their `CLAUDE.md`) is committed 
 - [X] T092 Update `backend/cloudbuild.yaml` and `frontend/cloudbuild.yaml`: set `ENV=prod` and `BASIC_AUTH_ENABLED=true` in the environment, add `--max-instances`, `--cpu-boost` and `--min-instances=0`; make the migration Job use `--max-retries=0` and a task timeout; use `--set-cloudsql-instances`; add a first step that fails fast if `_SQL_INSTANCE` or `_RUNTIME_SA` is empty
 - [X] T093 Build the images through Cloud Build (the Dockerfiles have already been built by Docker Compose) and fix anything that only fails there; until this has been run, never describe the Cloud Run deployment as verified
 - [X] T094 Create by hand the Cloud SQL instance (with the development, test and production databases kept separate), the Artifact Registry repository, the Secret Manager secrets (`database-url`, `basic-auth-user`, `basic-auth-password`) and the service accounts with the roles listed in `docs/requirements.md` section 12
-- [ ] T095 Deploy both services with `gcloud builds submit backend --config backend/cloudbuild.yaml` and `gcloud builds submit frontend --config frontend/cloudbuild.yaml`, run `quickstart.md` scenarios 1 to 10 on the deployed site, and put the URL at the top of `README.md` (credentials are shared outside the repository)
+- [X] T095 Deploy both services with `gcloud builds submit backend --config backend/cloudbuild.yaml` and `gcloud builds submit frontend --config frontend/cloudbuild.yaml`, run `quickstart.md` scenarios 1 to 10 on the deployed site, and put the URL at the top of `README.md` (credentials are shared outside the repository)
 
 ---
 

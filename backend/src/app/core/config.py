@@ -3,7 +3,7 @@
 import logging
 from typing import Literal
 
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,17 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-4-6"
     ai_max_output_tokens: int = 3000
     ai_requests_per_minute: int = 5
+
+    @field_validator("basic_auth_user")
+    @classmethod
+    def _trim_user(cls, value: str) -> str:
+        # A value saved through a console or a script often ends in a newline or spaces.
+        return value.strip()
+
+    @field_validator("basic_auth_password")
+    @classmethod
+    def _trim_password(cls, value: SecretStr) -> SecretStr:
+        return SecretStr(value.get_secret_value().strip())
 
     @model_validator(mode="after")
     def _check_authentication(self) -> "Settings":

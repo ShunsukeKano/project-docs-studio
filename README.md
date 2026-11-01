@@ -90,7 +90,7 @@ The time limit shaped four decisions. In short: reads are kept simple and always
 - **Correctness over speed of reads.** Public pages are rendered dynamically on every request and nothing is cached. That costs some read performance, but an unpublished article disappears on the next request, which the assignment's "404 for taken-down articles" requires, and a caching layer is out of scope anyway.
 - **Authentication added, but kept minimal.** The assignment treats authentication as out of scope, but the service is exposed on the internet, so the writer area uses one shared username and password (HTTP Basic). It is checked in the API itself, so calling the API directly is protected too. It is one explicit switch (`BASIC_AUTH_ENABLED`): required in production, and off by default for a local run so the project behaves as the assignment describes (no authentication). There are no accounts, roles or logout.
 - **A real database in tests, and Docker for the local run.** Tests run on a real `_test` database (never mocks) because the guarantees live in the database, and `docker compose up --build` gives anyone a working system from a fresh checkout with only Docker installed. The trade-off is that running locally needs Docker (or a PostgreSQL you install yourself), and the tests need that database to be reachable; the deployed site needs nothing installed.
-- **Cloud Run deployment is low priority and outside the assessed scope.** It was done last, by hand, on a small instance; there is no automatic deployment from GitHub yet.
+- **Cloud Run deployment is low priority and outside the assessed scope.** It was done last, first by hand and then with automatic deployment: a push to `main` on GitHub builds both Dockerfiles with Cloud Build and deploys them to Cloud Run (two triggers, set up in the Cloud Run console, checked after the first push). The database schema is not migrated automatically: after a schema change, run the migration job by hand (`gcloud run jobs execute docs-studio-api-migrate --region asia-northeast1`). It runs on a small instance, so it may be stopped after the assessment.
 
 ## Optional extras (outside the assessed scope)
 
@@ -128,7 +128,7 @@ Status values: **Done**, **Partial**, **Not done**. *Done* means built and cover
 | Extra (outside the assessed scope): AI body generation with Claude | Done, tested with a fake model; not run against the real model | The real call needs a key and a few cents of credit; run quickstart scenario 12 |
 | Automated tests for every invariant (INV-1 to INV-6) | Done | n/a |
 | Local run with Docker Compose (`docker compose up --build`) | Done | n/a |
-| Cloud Run deployment | Partial: deployed and its public side checked; the writer scenarios were not run on it | Build with `cloudbuild.yaml`; create Cloud SQL, Artifact Registry, Secret Manager and the service accounts by hand (Phase 12, low priority) |
+| Cloud Run deployment (with automatic deploys from GitHub) | Partial: deployed and its public side checked; the writer scenarios were not run on it | Build with `cloudbuild.yaml`; create Cloud SQL, Artifact Registry, Secret Manager and the service accounts by hand (Phase 12, low priority) |
 | AI draft generation | Not done: excluded from the plan | See "Improvements with more time" above |
 
 ## Repository layout

@@ -138,3 +138,35 @@ async def test_the_liveness_check_needs_no_credentials(secured_client: httpx.Asy
     response = await secured_client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+async def test_stray_whitespace_in_the_configured_login_does_not_lock_the_writer_out(
+    engine: AsyncEngine,
+) -> None:
+    # A secret saved through a console or a script often carries a trailing newline or spaces.
+    settings = Settings(
+        env="local",
+        basic_auth_enabled=True,
+        basic_auth_user="writer\n",
+        basic_auth_password="  local-test-only \r\n",
+    )
+    app = create_app(settings)
+    app.state.session_factory = create_session_factory(engine)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+        clean = await http.get(
+            "/api/v1/articles", auth=httpx.BasicAuth("writer", "local-test-only")
+        )
+        wrong = await http.get("/api/v1/articles", auth=httpx.BasicAuth("writer", "other"))
+    assert clean.status_code == 200
+    assert wrong.status_code == 401
+
+
+def test_a_login_that_is_only_whitespace_counts_as_empty() -> None:
+    with pytest.raises(ValueError, match="must both be set"):
+        Settings(
+            env="local",
+            basic_auth_enabled=True,
+            basic_auth_user=" \n",
+            basic_auth_password="x",
+        )

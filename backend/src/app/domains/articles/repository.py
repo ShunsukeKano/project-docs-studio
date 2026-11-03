@@ -62,6 +62,9 @@ async def update_draft_if_current(
 ) -> int | None:
     """Apply the edit only if the draft is still at the expected version.
 
+    This is the optimistic-concurrency check, in one statement: the WHERE clause matches only
+    while `draft_version` equals the version the writer loaded, and the same statement bumps it.
+    Two edits cannot both match, so the second one changes nothing instead of overwriting.
     Returns the new draft version, or None when no row matched (missing article or stale version).
     """
     statement = (
@@ -96,7 +99,11 @@ class PublishTarget(NamedTuple):
 
 
 async def lock_article_for_publish(session: AsyncSession, article_id: int) -> PublishTarget | None:
-    """Lock the article row until the transaction ends, and read it with its live snapshot."""
+    """Lock the article row until the transaction ends, and read it with its live snapshot.
+
+    FOR UPDATE makes Publish, Unpublish and delete of a version take turns on one article. The
+    lock order is always the article row first, then version rows, so they cannot deadlock.
+    """
     result = await session.execute(
         text(
             "SELECT a.id, a.status, a.draft_title, a.draft_body, a.draft_tags, a.draft_version, "
@@ -149,7 +156,13 @@ class Published(NamedTuple):
 
 
 async def mark_published(session: AsyncSession, article_id: int, version_id: int) -> Published:
-    """Point the article at the new snapshot. published_at is set only if it was never set."""
+    """Point the article at the new snapshot. published_at is set only if it was never set.
+
+    Status, pointer and published_at change in this one statement, which is what keeps them
+    consistent. COALESCE keeps the first publication time on a republish. clock_timestamp() is the
+    time of the statement itself, so a request that waited for the lock is not given an earlier
+    time.
+    """
     result = await session.execute(
         text(
             "UPDATE articles SET status = 'published', current_published_version_id = :version, "
@@ -232,6 +245,8 @@ async def restore_into_draft(
     """Copy a snapshot's title, body and tags into the draft, in one statement.
 
     It touches no snapshot and never changes the status, the pointer or published_at.
+    Only `articles` is written; `article_versions` is only read (the FROM clause), so the history
+    cannot be damaged. The expected-version condition stops it overwriting a newer edit.
     Returns the new draft version, or None when nothing matched.
     """
     result = await session.execute(
@@ -249,6 +264,9 @@ async def restore_into_draft(
 
 
 async def delete_version(session: AsyncSession, article_id: int, number: int) -> bool:
+    """Delete one snapshot. The service checks for the live version first; as a second line of
+    defence the foreign key (ON DELETE RESTRICT) makes the database refuse to delete a snapshot
+    the article still points at, even if that check were skipped by a bug."""
     result = await session.execute(
         text(
             "DELETE FROM article_versions WHERE article_id = :id AND version_number = :n "

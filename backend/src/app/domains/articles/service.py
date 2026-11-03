@@ -128,6 +128,13 @@ async def create_article(session: AsyncSession, data: ArticleCreate) -> ArticleD
 async def update_draft(
     session: AsyncSession, article_id: int, data: ArticleUpdate
 ) -> ArticleDetail:
+    """Edit the draft, but only if the writer saw its latest version (optimistic concurrency).
+
+    Edge case: two people editing the same draft. Every edit carries `expected_draft_version`,
+    the version the writer's screen was loaded from. The UPDATE in the repository matches only
+    while the draft is still at that version, so a stale edit changes nothing and is reported as
+    409, instead of silently overwriting the newer edit. No snapshot and no live pointer is touched.
+    """
     changes: dict[str, object] = {}
     if "title" in data.model_fields_set and data.title is not None:
         changes["draft_title"] = data.title
@@ -141,6 +148,8 @@ async def update_draft(
             session, article_id, data.expected_draft_version, changes
         )
         if new_version is None:
+            # No row matched: the article does not exist (404), or someone saved first (409).
+            # The 409 carries the current version so the screen can offer a resubmit.
             current = await repository.current_draft_version(session, article_id)
             if current is None:
                 raise NotFoundError()
@@ -175,13 +184,22 @@ async def publish_article(
 
     Order: lock the row (404), check the version (409), check the content (422), compare with
     the live snapshot (nothing new if equal), then write.
-    Any failure rolls everything back, so no step is ever left half done.
+
+    Edge case: atomic Publish. The three writes at the end (bump the counter, insert the snapshot,
+    point the article at it) share one transaction, so a failure or a crash anywhere rolls all of
+    them back. The article can never be "published" without a snapshot, or point at an old one.
+    The database backs this up with a CHECK on status, pointer and published_at, and a composite
+    foreign key that only allows the article's own versions.
+
+    Edge case: two Publish requests at once. Both take the same row lock; the second waits, then
+    sees the draft version has moved and gets 409, so exactly one snapshot is created.
     """
     async with session.begin():
-        await set_lock_timeout(session)
+        await set_lock_timeout(session)  # never wait on the row lock for ever (503 instead)
         target = await repository.lock_article_for_publish(session, article_id)
         if target is None:
             raise NotFoundError()
+        # Every decision below uses the locked row, never a value read before the lock.
         if target.draft_version != expected_draft_version:
             raise VersionConflictError(target.draft_version)
         if not target.draft_title.strip() or not target.draft_body.strip():
@@ -201,6 +219,7 @@ async def publish_article(
                 draft_version=target.draft_version,
             )
 
+        # The three writes below succeed or fail together (see the docstring).
         version_number = await repository.increment_version_counter(session, article_id)
         version_id = await repository.insert_snapshot(
             session,
@@ -273,7 +292,14 @@ async def _require_in_transaction(session: AsyncSession, article_id: int) -> Non
 async def restore_version(
     session: AsyncSession, article_id: int, number: int, expected_draft_version: int
 ) -> ArticleDetail:
-    """Copy a snapshot into the draft. Nothing is published and no snapshot is touched."""
+    """Copy a snapshot into the draft. Nothing is published and no snapshot is touched.
+
+    Edge case: Restore must not damage the history. It only rewrites the draft columns of the
+    article (one UPDATE in the repository): it never changes, adds or deletes a snapshot, and it
+    never changes the status, the live pointer or published_at. The writer has to press Publish
+    explicitly for the restored text to go live. Like an edit, it checks the expected draft
+    version, so it cannot overwrite a newer edit.
+    """
     async with session.begin():
         new_version = await repository.restore_into_draft(
             session, article_id, number, expected_draft_version
@@ -292,7 +318,9 @@ async def restore_version(
 async def delete_version(session: AsyncSession, article_id: int, number: int) -> None:
     """Delete a snapshot that is not the protected (live) one.
 
-    It takes the same row lock as Publish, so a delete and a publish never interleave.
+    Edge case: the live version must never be deleted, and hiding the button is not enough, so
+    the API refuses it (409 `version_is_live`). It takes the same row lock as Publish, so a delete
+    and a publish never interleave: the live version is read under the lock, not before it.
     """
     try:
         async with session.begin():
@@ -300,6 +328,7 @@ async def delete_version(session: AsyncSession, article_id: int, number: int) ->
             target = await repository.lock_article_for_publish(session, article_id)
             if target is None:
                 raise NotFoundError()
+            # The live version stays even after Unpublish, because the pointer is kept.
             if target.live_version_number == number:
                 raise VersionIsLiveError()
             if not await repository.delete_version(session, article_id, number):

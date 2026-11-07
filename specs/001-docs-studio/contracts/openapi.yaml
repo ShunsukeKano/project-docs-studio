@@ -141,6 +141,7 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/VersionConflict'}
         '422': {$ref: '#/components/responses/EmptyContentOrValidation'}
+        '503': {$ref: '#/components/responses/Busy'}
   /articles/{id}/unpublish:
     parameters:
       - {$ref: '#/components/parameters/ArticleId'}
@@ -160,6 +161,7 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/ValidationError'}
         '409': {$ref: '#/components/responses/NotPublished'}
+        '503': {$ref: '#/components/responses/Busy'}
   /articles/{id}/versions:
     parameters:
       - {$ref: '#/components/parameters/ArticleId'}
@@ -210,6 +212,7 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/ValidationError'}
         '409': {$ref: '#/components/responses/VersionIsLive'}
+        '503': {$ref: '#/components/responses/Busy'}
   /articles/{id}/versions/{n}/restore:
     parameters:
       - {$ref: '#/components/parameters/ArticleId'}
@@ -373,6 +376,15 @@ components:
       in: query
       schema: {type: integer, minimum: 0, default: 0}
   responses:
+    Busy:
+      description: Another request holds the article for too long (code `busy`). Try again shortly.
+      headers:
+        Retry-After:
+          schema: {type: string}
+          description: Seconds to wait before trying again.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
     Unauthorized:
       description: Missing or wrong credentials (code `unauthorized`).
       headers:

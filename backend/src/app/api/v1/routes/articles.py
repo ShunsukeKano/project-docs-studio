@@ -98,7 +98,7 @@ async def update_article(
     status_code=201,
     response_model=PublishResult,
     responses={
-        **error_responses(404, 409, 422),
+        **error_responses(404, 409, 422, 503),
         200: {"model": PublishResult, "description": "The draft equals the live snapshot."},
     },
 )
@@ -119,7 +119,7 @@ async def publish_article(
     operation_id="unpublishArticle",
     summary="Take a published article down",
     response_model=ArticleDetail,
-    responses=error_responses(404, 409),
+    responses=error_responses(404, 409, 503),
 )
 async def unpublish_article(
     session: Session,
@@ -159,7 +159,7 @@ async def get_version(
     operation_id="deleteVersion",
     summary="Delete a snapshot that is not protected",
     status_code=204,
-    responses=error_responses(404, 409),
+    responses=error_responses(404, 409, 503),
 )
 async def delete_version(
     session: Session,

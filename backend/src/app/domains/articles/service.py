@@ -1,9 +1,13 @@
 """Business rules for articles. This layer owns the transaction and is the only one that commits."""
 
-from sqlalchemy.exc import IntegrityError
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import (
+    BusyError,
     EmptyContentError,
     NotFoundError,
     NotPublishedError,
@@ -31,9 +35,21 @@ MAX_SLUG_LENGTH = 100
 SLUG_ATTEMPTS = 5
 UNIQUE_VIOLATION = "23505"
 FOREIGN_KEY_VIOLATION = "23503"
+LOCK_NOT_AVAILABLE = "55P03"
 
 
-def _sqlstate(error: IntegrityError) -> str | None:
+@contextmanager
+def _busy_on_lock_timeout() -> Iterator[None]:
+    """Turn a row-lock wait that hit `lock_timeout` into 503 `busy`, not an unexplained 500."""
+    try:
+        yield
+    except DBAPIError as error:
+        if _sqlstate(error) == LOCK_NOT_AVAILABLE:
+            raise BusyError() from error
+        raise
+
+
+def _sqlstate(error: DBAPIError) -> str | None:
     orig = error.orig
     code = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
     cause = getattr(orig, "__cause__", None)
@@ -194,49 +210,50 @@ async def publish_article(
     Edge case: two Publish requests at once. Both take the same row lock; the second waits, then
     sees the draft version has moved and gets 409, so exactly one snapshot is created.
     """
-    async with session.begin():
-        await set_lock_timeout(session)  # never wait on the row lock for ever (503 instead)
-        target = await repository.lock_article_for_publish(session, article_id)
-        if target is None:
-            raise NotFoundError()
-        # Every decision below uses the locked row, never a value read before the lock.
-        if target.draft_version != expected_draft_version:
-            raise VersionConflictError(target.draft_version)
-        if not target.draft_title.strip() or not target.draft_body.strip():
-            raise EmptyContentError()
+    with _busy_on_lock_timeout():
+        async with session.begin():
+            await set_lock_timeout(session)  # never wait on the row lock for ever (503 `busy`)
+            target = await repository.lock_article_for_publish(session, article_id)
+            if target is None:
+                raise NotFoundError()
+            # Every decision below uses the locked row, never a value read before the lock.
+            if target.draft_version != expected_draft_version:
+                raise VersionConflictError(target.draft_version)
+            if not target.draft_title.strip() or not target.draft_body.strip():
+                raise EmptyContentError()
 
-        if _equals_live_snapshot(target):
-            # Nothing new to record. An unpublished article simply goes back to published.
-            if target.status != "published":
-                await repository.set_published(session, article_id)
-            assert target.live_version_number is not None
-            assert target.published_at is not None
-            return PublishResult(
-                created=False,
-                version_number=target.live_version_number,
-                status="published",
-                published_at=target.published_at,
-                draft_version=target.draft_version,
+            if _equals_live_snapshot(target):
+                # Nothing new to record. An unpublished article simply goes back to published.
+                if target.status != "published":
+                    await repository.set_published(session, article_id)
+                assert target.live_version_number is not None
+                assert target.published_at is not None
+                return PublishResult(
+                    created=False,
+                    version_number=target.live_version_number,
+                    status="published",
+                    published_at=target.published_at,
+                    draft_version=target.draft_version,
+                )
+
+            # The three writes below succeed or fail together (see the docstring).
+            version_number = await repository.increment_version_counter(session, article_id)
+            version_id = await repository.insert_snapshot(
+                session,
+                article_id=article_id,
+                version_number=version_number,
+                title=target.draft_title,
+                body=target.draft_body,
+                tags=list(target.draft_tags),
             )
-
-        # The three writes below succeed or fail together (see the docstring).
-        version_number = await repository.increment_version_counter(session, article_id)
-        version_id = await repository.insert_snapshot(
-            session,
-            article_id=article_id,
-            version_number=version_number,
-            title=target.draft_title,
-            body=target.draft_body,
-            tags=list(target.draft_tags),
-        )
-        published = await repository.mark_published(session, article_id, version_id)
-        return PublishResult(
-            created=True,
-            version_number=version_number,
-            status=published.status,
-            published_at=published.published_at,
-            draft_version=published.draft_version,
-        )
+            published = await repository.mark_published(session, article_id, version_id)
+            return PublishResult(
+                created=True,
+                version_number=version_number,
+                status=published.status,
+                published_at=published.published_at,
+                draft_version=published.draft_version,
+            )
 
 
 async def list_public_articles(
@@ -258,15 +275,16 @@ async def get_public_article(session: AsyncSession, slug: str) -> PublicArticle:
 
 async def unpublish_article(session: AsyncSession, article_id: int) -> ArticleDetail:
     """Take a published article down. Only the status changes; nothing else is touched."""
-    async with session.begin():
-        await set_lock_timeout(session)
-        target = await repository.lock_article_for_publish(session, article_id)
-        if target is None:
-            raise NotFoundError()
-        if target.status != "published":
-            raise NotPublishedError()
-        await repository.set_unpublished(session, article_id)
-        return await _load_detail(session, article_id)
+    with _busy_on_lock_timeout():
+        async with session.begin():
+            await set_lock_timeout(session)
+            target = await repository.lock_article_for_publish(session, article_id)
+            if target is None:
+                raise NotFoundError()
+            if target.status != "published":
+                raise NotPublishedError()
+            await repository.set_unpublished(session, article_id)
+            return await _load_detail(session, article_id)
 
 
 async def list_versions(session: AsyncSession, article_id: int) -> list[VersionSummary]:
@@ -323,16 +341,17 @@ async def delete_version(session: AsyncSession, article_id: int, number: int) ->
     and a publish never interleave: the live version is read under the lock, not before it.
     """
     try:
-        async with session.begin():
-            await set_lock_timeout(session)
-            target = await repository.lock_article_for_publish(session, article_id)
-            if target is None:
-                raise NotFoundError()
-            # The live version stays even after Unpublish, because the pointer is kept.
-            if target.live_version_number == number:
-                raise VersionIsLiveError()
-            if not await repository.delete_version(session, article_id, number):
-                raise NotFoundError()
+        with _busy_on_lock_timeout():
+            async with session.begin():
+                await set_lock_timeout(session)
+                target = await repository.lock_article_for_publish(session, article_id)
+                if target is None:
+                    raise NotFoundError()
+                # The live version stays even after Unpublish, because the pointer is kept.
+                if target.live_version_number == number:
+                    raise VersionIsLiveError()
+                if not await repository.delete_version(session, article_id, number):
+                    raise NotFoundError()
     except IntegrityError as error:
         # The database refuses to delete a referenced snapshot even if the check above is bypassed.
         if _sqlstate(error) == FOREIGN_KEY_VIOLATION:

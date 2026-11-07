@@ -508,7 +508,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description AI drafting is switched off (code `ai_disabled`). */
+            /** @description Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -821,6 +821,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     unpublishArticle: {
@@ -872,6 +881,15 @@ export interface operations {
             };
             /** @description Invalid input (code `validation_error`). */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`). */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1028,6 +1046,15 @@ export interface operations {
             };
             /** @description Invalid input (code `validation_error`). */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`). */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -191,14 +191,6 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <div class="layer"><b>Repository (thin, optional)</b><span>domains/*/repository.py — only the locking and snapshot SQL that is worth isolating. Pass-through wrappers around the ORM are not written. Never commits.</span></div>
 <div class="layer db"><b>Model / Schema</b><span>models.py (tables) and schemas.py (input and output types). ORM objects are never returned as they are. Sessions use <code>expire_on_commit=False</code>.</span></div>
 <p class="cap">Dependencies point one way, from top to bottom. Errors are raised as <code>AppError</code> subclasses and converted to HTTP in a single exception handler.</p>
-<h3>Secure by default</h3>
-<ul>
-  <li>Two routers: the <b>writer</b> router carries <code>dependencies=[Depends(require_basic_auth)]</code> for the whole router, and the <b>public</b> router (<code>/public/*</code>) carries none. A new writer route is therefore protected without anyone remembering to add a check.</li>
-  <li>Authentication is switched by the explicit setting <code>BASIC_AUTH_ENABLED</code>: required in production, and off by default for a local run (the example environment file turns it off) so a fresh run behaves as the assignment describes; start-up logs a warning when it is off. It is never an implicit fallback.</li>
-  <li>With authentication enabled, a test walks <code>app.routes</code> and fails if any route outside <code>/api/v1/public</code> and <code>/healthz</code> does not return 401 without credentials.</li>
-  <li>Auth is a dependency, so it runs before body validation: 401 comes before 404 and 422.</li>
-  <li>Compare credentials as UTF-8 bytes with <code>secrets.compare_digest</code>, without short-circuiting; never log the <code>Authorization</code> header; refuse to start if authentication is enabled and a variable is empty (and, in production, unless authentication is enabled); disable <code>/docs</code> and <code>/openapi.json</code> in production; install no CORS middleware.</li>
-</ul>
 </div>
 <div>
 <h3>Folders</h3>
@@ -227,9 +219,17 @@ svg text{fill:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 <p class="cap">The specification lives in <code>specs/001-docs-studio/</code> at the repository root, not inside a project folder.</p>
 </div>
 </div>
+<h3>Secure by default</h3>
+<ul>
+  <li>Two routers: the <b>writer</b> router carries <code>dependencies=[Depends(require_basic_auth)]</code> for the whole router, and the <b>public</b> router (<code>/public/*</code>) carries none. A new writer route is therefore protected without anyone remembering to add a check.</li>
+  <li>Authentication is switched by the explicit setting <code>BASIC_AUTH_ENABLED</code>: required in production, and off by default for a local run (the example environment file turns it off) so a fresh run behaves as the assignment describes; start-up logs a warning when it is off. It is never an implicit fallback.</li>
+  <li>With authentication enabled, a test walks <code>app.routes</code> and fails if any route outside <code>/api/v1/public</code> and <code>/healthz</code> does not return 401 without credentials.</li>
+  <li>Auth is a dependency, so it runs before body validation: 401 comes before 404 and 422.</li>
+  <li>Compare credentials as UTF-8 bytes with <code>secrets.compare_digest</code>, without short-circuiting; never log the <code>Authorization</code> header; refuse to start if authentication is enabled and a variable is empty (and, in production, unless authentication is enabled); disable <code>/docs</code> and <code>/openapi.json</code> in production; install no CORS middleware.</li>
+</ul>
 <h3>Error shape (uniform, and declared in OpenAPI)</h3>
 <pre><code>{ "error": { "code": "version_conflict", "message": "...", "details": { "current_draft_version": 7 } } }</code></pre>
-<p>Codes: <code>unauthorized</code>, <code>not_found</code>, <code>validation_error</code>, <code>version_conflict</code>, <code>empty_content</code>, <code>not_published</code>, <code>version_is_live</code>, <code>slug_conflict</code>. FastAPI's default 422 body is replaced by this envelope, and every route declares its error responses (<code>responses={404: ..., 409: ...}</code>) so the generated TypeScript client types the errors instead of treating them as <code>unknown</code>.</p>
+<p>Codes: <code>unauthorized</code>, <code>not_found</code>, <code>validation_error</code>, <code>version_conflict</code>, <code>empty_content</code>, <code>not_published</code>, <code>version_is_live</code>, <code>slug_conflict</code>, <code>busy</code> (503: another request held the article lock for more than 3 seconds; the client may retry). FastAPI's default 422 body is replaced by this envelope, and every route declares its error responses (<code>responses={404: ..., 409: ...}</code>) so the generated TypeScript client types the errors instead of treating them as <code>unknown</code>.</p>
 
 <!-- 5 -->
 <h2 id="frontend">5. Frontend structure (frontend)</h2>
@@ -793,7 +793,7 @@ DELETE FROM article_versions
 <ul>
   <li>One session and one <code>async with session.begin()</code> per request, owned by the Service; <code>expire_on_commit=False</code>.</li>
   <li>Locking reads use <code>with_for_update(of=Article).execution_options(populate_existing=True)</code>, otherwise a stale object in the identity map defeats the lock. Prefer Core <code>UPDATE … RETURNING</code> on the concurrency paths.</li>
-  <li><code>SET LOCAL lock_timeout</code> and <code>statement_timeout</code>; map a lock timeout to 503. On SQLSTATE 23505 for the slug, retry the numbering (U15); map 23503 to 409 <code>version_is_live</code>; never return a 500.</li>
+  <li><code>SET LOCAL lock_timeout</code> and <code>statement_timeout</code>; map a lock timeout to 503 <code>busy</code> (with <code>Retry-After</code>). On SQLSTATE 23505 for the slug, retry the numbering (U15); map 23503 to 409 <code>version_is_live</code>; never return a 500.</li>
   <li>Pool: <code>pool_size=3</code>, <code>max_overflow=2</code>, <code>pool_pre_ping=True</code>, <code>pool_recycle=1800</code>, so three Cloud Run instances stay within a small Cloud SQL instance's <code>max_connections</code>. Connect lazily so a database blip at start-up does not kill the container.</li>
   <li>Timestamps use <code>clock_timestamp()</code> (statement time), so a request that waited for the lock does not get an earlier time than the previous version. The session time zone is UTC.</li>
 </ul>
@@ -807,12 +807,12 @@ DELETE FROM article_versions
 <tr><td><span class="tag be">Writer</span></td><td><code>GET /articles?status=&amp;limit=&amp;offset=</code></td><td>List all articles, newest <code>updated_at</code> first (at most 100)</td><td>200</td><td>422 unknown status</td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}</code></td><td>Detail, including the draft</td><td>200</td><td>404</td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>PATCH /articles/{id}</code></td><td>Partial update of the draft: omitted fields keep their value, <code>tags</code> replaces the whole list, <code>expected_draft_version</code> required, no slug</td><td>200</td><td>404, 409 <code>version_conflict</code>, 422</td></tr>
-<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/publish</code></td><td>Publish (body: <code>expected_draft_version</code>)</td><td>201 new snapshot / 200 unchanged draft</td><td>404, 409 <code>version_conflict</code>, 422 <code>empty_content</code></td></tr>
-<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/unpublish</code></td><td>Take the article down (no version check)</td><td>200</td><td>404, 409 <code>not_published</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/publish</code></td><td>Publish (body: <code>expected_draft_version</code>)</td><td>201 new snapshot / 200 unchanged draft</td><td>404, 409 <code>version_conflict</code>, 422 <code>empty_content</code>, 503 <code>busy</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/unpublish</code></td><td>Take the article down (no version check)</td><td>200</td><td>404, 409 <code>not_published</code>, 503 <code>busy</code></td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}/versions</code></td><td>History, newest first: id, <code>version_number</code>, title, <code>created_at</code>, <code>is_live</code> (no body)</td><td>200</td><td>404</td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>GET /articles/{id}/versions/{n}</code></td><td>Full content of one version</td><td>200</td><td>404</td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>POST /articles/{id}/versions/{n}/restore</code></td><td>Copy the version into the draft (body: <code>expected_draft_version</code>; does not publish)</td><td>200</td><td>404, 409 <code>version_conflict</code></td></tr>
-<tr><td><span class="tag be">Writer</span></td><td><code>DELETE /articles/{id}/versions/{n}</code></td><td>Delete a version (no version check)</td><td>204</td><td>404, 409 <code>version_is_live</code></td></tr>
+<tr><td><span class="tag be">Writer</span></td><td><code>DELETE /articles/{id}/versions/{n}</code></td><td>Delete a version (no version check)</td><td>204</td><td>404, 409 <code>version_is_live</code>, 503 <code>busy</code></td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>GET /ai/status</code> <em>(optional extra)</em></td><td>Is the AI extra on? (The screen shows its button either way.)</td><td>200</td><td>401</td></tr>
 <tr><td><span class="tag be">Writer</span></td><td><code>POST /ai/draft</code> <em>(optional extra, R15)</em></td><td>From the title, tags, notes and instructions, stream a proposed body as server-sent events (<code>delta</code>, then <code>done</code> or <code>error</code>). Writes nothing</td><td>200 (a stream)</td><td>401, 422, 429 <code>rate_limited</code>, 502 <code>ai_unavailable</code>, 503 <code>ai_disabled</code></td></tr>
 <tr><td><span class="tag fe">Public</span></td><td><code>GET /public/articles?limit=&amp;offset=</code></td><td>Published list: slug, title, tags, <code>published_at</code>, updated date (only if republished); at most 100</td><td>200 (<code>[]</code> when empty)</td><td>—</td></tr>

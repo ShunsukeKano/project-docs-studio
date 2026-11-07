@@ -48,6 +48,17 @@ class ValidationFailedError(AppError):
     default_message = "The request is not valid."
 
 
+class BusyError(AppError):
+    """Another request held the article row lock for too long (Postgres `lock_timeout`)."""
+
+    status_code = 503
+    code = "busy"
+    default_message = "The article is being changed by another request. Please try again."
+
+    def __init__(self) -> None:
+        super().__init__(headers={"Retry-After": "1"})
+
+
 class AiDisabledError(AppError):
     status_code = 503
     code = "ai_disabled"
@@ -119,7 +130,10 @@ _RESPONSE_DESCRIPTIONS = {
     422: "Invalid input (`validation_error`) or empty content (`empty_content`). Nothing changes.",
     429: "Too many requests (code `rate_limited`). The `Retry-After` header says how long to wait.",
     502: "The AI draft could not be made (code `ai_unavailable`). No internal detail is given.",
-    503: "AI drafting is switched off (code `ai_disabled`).",
+    503: (
+        "Temporarily unavailable: another request holds the article (code `busy`, retry shortly) "
+        "or AI drafting is switched off (code `ai_disabled`)."
+    ),
 }
 
 

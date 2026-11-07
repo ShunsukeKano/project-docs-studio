@@ -648,7 +648,7 @@
                 }
               }
             },
-            "description": "AI drafting is switched off (code `ai_disabled`)."
+            "description": "Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`)."
           }
         },
         "security": [
@@ -1100,6 +1100,16 @@
               }
             },
             "description": "Invalid input (code `validation_error`)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`)."
           }
         },
         "security": [
@@ -1179,6 +1189,16 @@
               }
             },
             "description": "Invalid input (code `validation_error`)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`)."
           }
         },
         "security": [
@@ -1335,6 +1355,16 @@
               }
             },
             "description": "Invalid input (code `validation_error`)."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Temporarily unavailable: another request holds the article (code `busy`, retry shortly) or AI drafting is switched off (code `ai_disabled`)."
           }
         },
         "security": [

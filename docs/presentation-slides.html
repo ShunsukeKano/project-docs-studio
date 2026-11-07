@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Northbeam Docs Studio Presentation Slides</title>
+<style>
+:root{
+  --bg:#f4f1f8; --card:#ffffff; --fg:#111111; --muted:#5e5e5e; --border:#d8d3e0;
+  --fe:#a100ff; --fe-bg:#f1e6ff; --deep:#7500c0; --dark:#460073;
+  --be:#111111; --be-bg:#ececec;
+  --warn:#c8102e; --warn-bg:#fde8eb; --ok:#0b6b3a; --ok-bg:#e3f4ea;
+  --code-bg:#efecf3;
+}
+html{background:var(--bg);color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);overflow:hidden;
+  font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP","Yu Gothic",Helvetica,Arial,sans-serif}
+.frame{position:fixed;left:50%;top:0;transform:translateX(-50%);overflow:hidden;background:#fff;box-shadow:0 2px 24px rgba(70,0,115,.18)}
+.stage{width:1280px;height:720px;transform-origin:0 0;position:relative}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;padding:48px 72px 56px;background:#fff}
+.slide.active{display:flex;animation:fade .18s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.slide.active{animation:none}}
+.slide::before{content:"";position:absolute;left:0;right:0;top:0;height:10px;background:linear-gradient(90deg,#460073,#7500c0,#a100ff)}
+.slide h2{font-size:40px;line-height:1.2;margin:8px 0 22px;letter-spacing:.005em}
+.slide h2 small{display:block;font-size:20px;font-weight:600;color:var(--deep);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.slide .foot{position:absolute;left:72px;right:72px;bottom:18px;display:flex;justify-content:space-between;font-size:15px;color:var(--muted)}
+.body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:18px;padding-bottom:18px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.cols.wide-l{grid-template-columns:1.25fr 1fr}
+ul.pts{margin:0;padding:0;list-style:none;font-size:26px;line-height:1.4}
+ul.pts li{position:relative;padding-left:30px;margin:0 0 12px}
+ul.pts li::before{content:"";position:absolute;left:4px;top:.5em;width:12px;height:12px;border-radius:3px;background:var(--fe)}
+ul.pts.sm{font-size:22px} ul.pts.sm li{margin-bottom:8px}
+ol.steps{margin:0;padding:0;list-style:none;font-size:24px;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:8px 0 8px 58px;margin:0 0 6px;border-bottom:1px solid var(--border);line-height:1.3}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:7px;width:38px;height:38px;border-radius:50%;background:var(--fe);color:#fff;font-weight:700;font-size:21px;text-align:center;line-height:38px}
+ol.steps li span{display:block;font-size:19px;color:var(--muted);margin-top:2px}
+.card{background:#fff;border:1px solid var(--border);border-top:5px solid var(--fe);border-radius:12px;padding:16px 20px}
+.card.be{border-top-color:var(--be)} .card.db{border-top-color:var(--deep)}
+.card h3{margin:0 0 8px;font-size:25px}
+.card p,.card li{font-size:21px;line-height:1.4}
+.card ul{margin:0;padding-left:22px} .card li{margin-bottom:5px}
+.callout{background:var(--fe-bg);border-left:6px solid var(--fe);border-radius:8px;padding:16px 22px;font-size:26px;line-height:1.4;color:#1b0030}
+.callout.big{font-size:32px;line-height:1.35;font-weight:600}
+.warn{background:var(--warn-bg);border-left:6px solid var(--warn);border-radius:8px;padding:12px 20px;font-size:21px;line-height:1.4}
+.good{background:var(--ok-bg);border-left:6px solid var(--ok);border-radius:8px;padding:12px 20px;font-size:21px;line-height:1.4}
+table.t{border-collapse:collapse;width:100%;font-size:21px}
+table.t th,table.t td{border:1px solid var(--border);padding:8px 12px;text-align:left;vertical-align:top;line-height:1.3}
+table.t th{background:var(--code-bg);border-bottom:3px solid var(--fe);font-weight:700}
+table.t tr.hl td{background:var(--fe-bg)}
+table.t tr.bad td{background:var(--warn-bg)}
+table.t td.x{background:#fff7d6}
+code{background:var(--code-bg);padding:1px 7px;border-radius:5px;font:.82em ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code-bg);padding:14px 18px;border-radius:10px;margin:0;font:21px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden}
+.badge{display:inline-block;padding:1px 12px;border-radius:999px;font-size:.8em;font-weight:700;background:var(--fe);color:#fff}
+.badge.grey{background:#6b6b6b} .badge.red{background:var(--warn)} .badge.green{background:var(--ok)}
+.num{font-size:84px;font-weight:800;color:var(--deep);line-height:1}
+.numlbl{font-size:23px;color:var(--muted);margin-top:6px;line-height:1.3}
+.tc{text-align:center}
+.title-slide{justify-content:center;background:linear-gradient(135deg,#460073 0%,#7500c0 55%,#a100ff 100%);color:#fff}
+.title-slide::before{display:none}
+.title-slide h1{font-size:92px;margin:0 0 10px;letter-spacing:.01em;line-height:1.05}
+.title-slide .tag{font-size:42px;font-weight:600;margin:0 0 34px}
+.title-slide p{font-size:26px;margin:0 0 8px;opacity:.95}
+.title-slide .foot{color:#e8d6ff}
+svg{display:block;width:100%;height:auto}
+svg text{font-family:inherit}
+.bar{position:fixed;left:0;right:0;bottom:0;height:48px;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border-top:1px solid var(--border);font-size:15px;color:var(--muted)}
+.bar button{font:inherit;color:var(--fg);background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 14px;cursor:pointer;min-height:34px}
+.bar button:hover{border-color:var(--fe);color:var(--deep)}
+.bar button:focus-visible{outline:3px solid var(--fe);outline-offset:2px}
+.bar .count{min-width:70px;text-align:center}
+.notes{position:fixed;left:50%;transform:translateX(-50%);bottom:56px;width:min(900px,94vw);background:#fff;border:2px solid var(--fe);border-radius:12px;padding:14px 18px;font-size:17px;line-height:1.55;box-shadow:0 6px 28px rgba(0,0,0,.2);z-index:5}
+.notes[hidden]{display:none}
+aside.n{display:none}
+@media print{
+  @page{size:1280px 720px;margin:0}
+  html,body{background:#fff;overflow:visible}
+  .frame{position:static;transform:none;width:auto!important;height:auto!important;overflow:visible;box-shadow:none}
+  .stage{transform:none!important;width:auto;height:auto}
+  .slide{position:relative;display:flex!important;width:1280px;height:720px;break-after:page;animation:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bar,.notes{display:none!important}
+}
+
+.slide h2{font-size:36px;margin:6px 0 14px}
+.slide h2 small{font-size:18px;margin-bottom:4px}
+.body{gap:12px;padding-bottom:14px;justify-content:flex-start}
+table.t.sm th,table.t.sm td{padding:6px 10px;font-size:18px;line-height:1.28}
+table.t.xs th,table.t.xs td{padding:5px 9px;font-size:16.5px;line-height:1.25}
+table.t.xxs th,table.t.xxs td{padding:4px 9px;font-size:15.5px;line-height:1.22}
+pre.sm{font-size:15px;line-height:1.4;padding:10px 14px}
+pre.xs{font-size:15.5px;line-height:1.42;padding:10px 14px}
+.card.sm{padding:10px 14px}
+.card.sm h3{font-size:23px;margin-bottom:6px}
+.card.sm li,.card.sm p{font-size:19px;line-height:1.38}
+.callout.sm{font-size:21px;padding:12px 18px}
+.warn.sm,.good.sm{font-size:19px;padding:10px 16px}
+ul.pts.xs{font-size:21px} ul.pts.xs li{margin-bottom:6px}
+.flow{display:flex;align-items:stretch;gap:6px}
+.flow .n{flex:1;background:#fff;border:1px solid var(--border);border-top:4px solid var(--fe);border-radius:8px;padding:8px 10px;font-size:18px;line-height:1.3}
+.flow .n.be{border-top-color:var(--be)} .flow .n.db{border-top-color:var(--deep)}
+.flow .n b{display:block;font-size:19px;margin-bottom:3px}
+.flow .a{align-self:center;color:var(--muted);font-size:22px}
+.lbl{font-size:19px;font-weight:700;color:var(--deep);margin:2px 0}
+.row2{display:grid;grid-template-columns:.9fr 1.5fr;gap:16px;align-items:center}
+.nowrap{white-space:nowrap}
+
+.title-slide h1{font-size:78px}
+.slide h2{font-size:30px;line-height:1.22;margin:4px 0 12px;font-weight:800}
+.slide h2 small{font-size:17px}
+.slide.sw .body{padding-bottom:96px;gap:10px}
+.sowhat{position:absolute;left:64px;right:64px;bottom:48px;display:flex;gap:16px;align-items:center;background:#460073;color:#fff;border-radius:10px;padding:10px 18px;font-size:20px;line-height:1.35}
+table.t td.c{text-align:center}
+table.t.lg th,table.t.lg td{font-size:23px;padding:11px 16px;line-height:1.4}
+table.t.kv th{display:none}
+table.t.kv td:first-child{font-weight:800;color:#7500c0;white-space:nowrap;width:1%}
+table.t.mx th,table.t.mx td{padding:4px 6px;font-size:14.5px}
+table.t.mx th{white-space:nowrap}
+table.t td pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+table.t.sm th:first-child,table.t.sm td:first-child{white-space:nowrap;width:1%}
+.ref{position:absolute;left:64px;right:64px;bottom:100px}
+.rh{font-size:14.5px;font-weight:800;color:#7500c0;line-height:1.3;margin-bottom:3px}
+.rh span{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:400;color:#5e5e5e;margin-left:10px}
+.rg{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:4px 14px}
+.ri{display:flex;flex-direction:column;border-left:3px solid #d8d3e0;padding-left:8px;min-width:0}
+.rl{font-size:14.5px;font-weight:700;color:#111;line-height:1.25}
+.rp{font:12.5px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:#5e5e5e;word-break:break-all}
+.sowhat code{background:rgba(255,255,255,.2);color:#fff;border-radius:4px}
+.sowhat b{background:#fff;color:#460073;border-radius:6px;padding:2px 10px;font-size:15px;letter-spacing:.04em;white-space:nowrap}
+table.t.xs th,table.t.xs td{padding:4px 9px;font-size:15.5px;line-height:1.22}
+table.t.xxs th,table.t.xxs td{padding:3px 9px;font-size:15px;line-height:1.2}
+</style>
+</head>
+<body>
+<main class="frame" id="frame" aria-label="Northbeam Docs Studio Presentation Slides">
+<div class="stage" id="stage">
+<section class="slide title-slide" aria-roledescription="slide" aria-label="1 / 14: Title">
+<h1>Northbeam Docs Studio</h1>
+<p class="tag">Edit freely. Publish safely.</p>
+<p>A draft-and-publish content service for writers, with a public documentation site</p>
+<p>FastAPI · PostgreSQL · Next.js · Tailwind CSS</p>
+<div class="foot"><span>Northbeam Docs Studio</span><span>1 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="2 / 14: Summary">
+<h2><small>Summary</small>Writers edit freely without changing what readers see, by design</h2><div class="body"><table class="t lg kv"><tr><th></th><th></th></tr><tr><td>Situation</td><td>Internal writers draft, edit, publish and take down articles; readers see only published ones on a public site.</td></tr><tr><td>Complication</td><td>If a draft and the published text share one row, editing leaks into what readers see, a published text can change, and two people acting at once overwrite each other or publish twice.</td></tr><tr><td>Question</td><td>How can writers edit freely while what readers see stays frozen and consistent?</td></tr><tr><td>Answer</td><td>Keep drafts and snapshots in separate tables, publish in one transaction, control concurrent writes by a version check and a row lock, and let the database enforce the rules again.</td></tr><tr><td>Direction</td><td>Judge the design by why it cannot break, not only by what works. Publish and concurrency (slides 8-11) is where I would like the most discussion.</td></tr></table></div><div class="sowhat"><b>Takeaway</b><span>Edit freely, publish safely, and let the database back it up.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>2 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="3 / 14: Storyline">
+<h2><small>Storyline</small>Five reasons the answer holds, and where to find each</h2><div class="body"><table class="t lg"><tr><th>Reason</th><th>How it works</th><th>Slides</th></tr><tr><td>Draft and snapshots are separate</td><td>Two tables; the live version is the one the reference points at</td><td>5</td></tr><tr><td>Publish is all or nothing</td><td>One transaction, decided on a locked row</td><td>4, 8</td></tr><tr><td>Concurrent writes are controlled</td><td>Edits: version check on save (409). Publish: row lock</td><td>9, 10</td></tr><tr><td>The database enforces the rules again</td><td>Triggers, CHECK, foreign keys</td><td>6, 11</td></tr><tr><td>Tested on a real PostgreSQL</td><td>364 backend · 29 frontend · 21 browser tests</td><td>13</td></tr></table></div><div class="sowhat"><b>Focus</b><span>Most of the time goes to publish and concurrency (slides 8-11).</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>3 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="4 / 14: Request flow">
+<h2><small>Request flow</small>Readers follow the pointer; a publish is one all-or-nothing transaction</h2>
+<div class="body">
+<div class="lbl">Reading a published article (no sign-in)</div><div class="flow"><div class="n "><b>Browser</b>opens <code>/docs/[slug]</code></div><div class="a">→</div><div class="n "><b>Server Component</b>renders the page on every request</div><div class="a">→</div><div class="n be"><b>API</b><code>GET /public/articles/{slug}</code></div><div class="a">→</div><div class="n be"><b>Service</b>fetches the live snapshot with one JOIN</div><div class="a">→</div><div class="n db"><b>article_versions</b><code>draft_*</code> is never read</div></div><p style="font-size:18px;margin:0">Unpublished, never published or missing: the service raises <code>NotFoundError</code>, the same <b>404</b> every time.</p>
+<div class="lbl" style="margin-top:6px">A writer publishes</div><div class="flow"><div class="n "><b>1 Browser</b>writer presses Publish</div><div class="a">→</div><div class="n "><b>2 Server Action</b>adds the Basic credentials, calls the API</div><div class="a">→</div><div class="n be"><b>3 Router</b>checks sign-in and the body</div><div class="a">→</div><div class="n be"><b>4 Service</b>locks the row and decides</div><div class="a">→</div><div class="n db"><b>5 Write</b>snapshot + pointer, one transaction</div><div class="a">→</div><div class="n "><b>6 Answer</b>201 with the version number</div></div></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/</span></div><div class="rg"><div class="ri"><span class="rl">Reader: route</span><span class="rp">api/v1/routes/public.py:33-41</span></div><div class="ri"><span class="rl">Reader: service</span><span class="rp">domains/articles/service.py:250-256</span></div><div class="ri"><span class="rl">Reader: SQL</span><span class="rp">domains/articles/repository.py:195-207</span></div><div class="ri"><span class="rl">Writer: screen action</span><span class="rp">frontend/…/(studio)/studio/actions.ts:66</span></div><div class="ri"><span class="rl">Writer: route</span><span class="rp">api/v1/routes/articles.py:94-115</span></div><div class="ri"><span class="rl">Writer: service</span><span class="rp">domains/articles/service.py:180-239</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>Nothing leaks, and a failed publish leaves nothing half-done.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>4 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="5 / 14: Database">
+<h2><small>Database structure</small>Two tables: editing never touches what readers see, snapshots never change</h2>
+<div class="body"><div class="cols">
+<div><div class="lbl">articles: one row per article, holds the draft</div><pre class="xs" style="font-size:13px;line-height:1.35">articles
+  slug, status  ('draft' | 'published' | 'unpublished')
+  draft_title, draft_body, draft_tags   -- editable
+  draft_version        INT NOT NULL DEFAULT 1   -- edit token
+  last_version_number  INT NOT NULL DEFAULT 0   -- never goes down
+  current_published_version_id BIGINT           -- the live pointer
+  published_at         TIMESTAMPTZ              -- first publication
+  CONSTRAINT articles_publish_consistency CHECK (
+    (status = 'draft' AND pointer IS NULL
+                      AND published_at IS NULL)
+    OR (status IN ('published','unpublished')
+        AND pointer IS NOT NULL
+        AND published_at IS NOT NULL))</pre></div>
+<div><div class="lbl">article_versions: one row per snapshot</div><pre class="xs" style="font-size:13px;line-height:1.35">article_versions
+  id  BIGINT IDENTITY PRIMARY KEY
+  article_id  BIGINT NOT NULL
+              REFERENCES articles ON DELETE RESTRICT
+  version_number INT NOT NULL CHECK (> 0)
+  title, body, tags
+  UNIQUE (article_id, version_number)
+  UNIQUE (article_id, id)   -- target of the FK below
+
+ALTER TABLE articles ADD CONSTRAINT
+  articles_current_version_fk
+  FOREIGN KEY (id, current_published_version_id)
+  REFERENCES article_versions (article_id, id)
+  ON DELETE RESTRICT</pre></div>
+</div>
+<svg viewBox="0 -14 1100 116" role="img" aria-label="The column current_published_version_id of the articles row holds the id of one article_versions row: the live version"><defs><marker id="rp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7500c0"/></marker></defs><rect x="0" y="26" width="440" height="70" rx="10" fill="#e6dcff" stroke="#7500c0" stroke-width="2.5"/><text x="220" y="54" text-anchor="middle" font-size="18" font-weight="800">articles row (id 7)</text><text x="220" y="82" text-anchor="middle" font-size="16" font-family="ui-monospace,Menlo,monospace" fill="#460073">current_published_version_id = 12</text><text x="545" y="66" text-anchor="end" font-size="14" fill="#5e5e5e"></text><rect x="560" y="26" width="160" height="70" rx="10" fill="#ffffff" stroke="#8a8a8a" stroke-width="2.5"/><text x="640" y="66" text-anchor="middle" font-size="17" font-family="ui-monospace,Menlo,monospace">id 10 · v1</text><rect x="735" y="26" width="160" height="70" rx="10" fill="#ffffff" stroke="#8a8a8a" stroke-width="2.5"/><text x="815" y="66" text-anchor="middle" font-size="17" font-family="ui-monospace,Menlo,monospace">id 11 · v2</text><rect x="910" y="26" width="160" height="70" rx="10" fill="#e3f4ea" stroke="#0b6b3a" stroke-width="2.5"/><text x="990" y="66" text-anchor="middle" font-size="17" font-family="ui-monospace,Menlo,monospace">id 12 · v3</text><text x="990" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="#0b6b3a">live</text><path d="M 440 44 C 520 -16, 900 -16, 985 22" fill="none" stroke="#7500c0" stroke-width="3" marker-end="url(#rp)"/><text x="720" y="-2" text-anchor="middle" font-size="15" font-weight="700" fill="#7500c0">points at (foreign key)</text></svg></div>
+<div class="ref"><div class="rh">Code<span>backend/db-automation-apply/001_schema.sql</span></div><div class="rg"><div class="ri"><span class="rl">articles table</span><span class="rp">lines 8-45</span></div><div class="ri"><span class="rl">article_versions table</span><span class="rp">lines 50-60</span></div><div class="ri"><span class="rl">Pointer foreign key</span><span class="rp">lines 64-67</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>“Live” means “the pointer points at it”. There is no flag to keep in sync.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>5 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="6 / 14: Invariants">
+<h2><small>Database structure: invariants</small>Every rule is guarded in the code and again in the database</h2>
+<div class="body">
+<table class="t xxs"><tr><th>Invariant</th><th>Application (service)</th><th>Database (last line of defence)</th></tr>
+<tr><td>A published snapshot never changes</td><td>No update API or method exists</td><td>UPDATE trigger and TRUNCATE trigger on <code>article_versions</code></td></tr>
+<tr><td>Publish is atomic</td><td>One transaction, row lock, statement-time timestamps</td><td><code>articles_publish_consistency</code> CHECK and the composite FK: no dangling pointer</td></tr>
+<tr><td>Pointer only moves forward; no return to “never published”</td><td>Publish makes a higher number and points at it</td><td><code>articles_guard</code> trigger: pointer and <code>published_at</code> not cleared, pointer not moved back, slug fixed</td></tr>
+<tr><td>The live version cannot be deleted</td><td>Delete takes the row lock, checks the pointer, 409 <code>version_is_live</code></td><td><code>ON DELETE RESTRICT</code> on the composite FK (23503 → same 409)</td></tr>
+<tr><td>Restore does not damage history</td><td>One UPDATE of <code>draft_*</code> and <code>draft_version</code></td><td>(tests check every snapshot row is unchanged)</td></tr>
+<tr><td>Concurrent edits are detected</td><td><code>WHERE draft_version = :expected</code>; same comparison under the lock for Publish</td><td>—</td></tr>
+<tr><td>History survives Unpublish</td><td>Unpublish only updates <code>status</code></td><td>CHECK and <code>articles_guard</code> keep the pointer and <code>published_at</code></td></tr>
+<tr><td>Version numbers are never reused</td><td><code>last_version_number</code> incremented under the lock</td><td><code>UNIQUE (article_id, version_number)</code>; the counter never decreases</td></tr></table>
+</div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/domains/articles/service.py</span></div><div class="rg"><div class="ri"><span class="rl">Edit the draft</span><span class="rp">lines 128-157</span></div><div class="ri"><span class="rl">Publish</span><span class="rp">lines 180-239</span></div><div class="ri"><span class="rl">Unpublish</span><span class="rp">lines 259-269</span></div><div class="ri"><span class="rl">Restore</span><span class="rp">lines 292-315</span></div><div class="ri"><span class="rl">Delete a version</span><span class="rp">lines 318-340</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>A published snapshot cannot change, even if the application code is wrong.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>6 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="7 / 14: State transitions">
+<h2><small>State transitions</small>Only Publish moves the pointer; Edit and Restore touch the draft alone</h2><div class="body"><div class="cols" style="grid-template-columns:1fr 1fr"><div><svg viewBox="0 0 600 350" role="img" aria-label="State diagram: draft, published and unpublished, with the operations between them"><defs><marker id="sg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5e5e5e"/></marker><marker id="sp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7500c0"/></marker></defs><rect x="0" y="50" width="150" height="84" rx="12" fill="#f4f4f4" stroke="#8a8a8a" stroke-width="3"/><text x="75" y="88" text-anchor="middle" font-size="22" font-weight="800">draft</text><text x="75" y="112" text-anchor="middle" font-size="14" fill="#444">never published</text><rect x="225" y="50" width="150" height="84" rx="12" fill="#e3f4ea" stroke="#0b6b3a" stroke-width="3"/><text x="300" y="88" text-anchor="middle" font-size="22" font-weight="800">published</text><text x="300" y="112" text-anchor="middle" font-size="14" fill="#444">readers see the live version</text><rect x="450" y="50" width="150" height="84" rx="12" fill="#fde8eb" stroke="#c8102e" stroke-width="3"/><text x="525" y="88" text-anchor="middle" font-size="22" font-weight="800">unpublished</text><text x="525" y="112" text-anchor="middle" font-size="14" fill="#444">taken down: 404</text><line x1="154" y1="92" x2="221" y2="92" stroke="#7500c0" stroke-width="3" marker-end="url(#sp)"/><text x="188" y="80" text-anchor="middle" font-size="15" font-weight="700" fill="#7500c0">Publish</text><text x="188" y="116" text-anchor="middle" font-size="12.5" fill="#444">creates v1</text><line x1="379" y1="78" x2="446" y2="78" stroke="#5e5e5e" stroke-width="3" marker-end="url(#sg)"/><text x="413" y="66" text-anchor="middle" font-size="15" font-weight="700">Unpublish</text><line x1="446" y1="108" x2="379" y2="108" stroke="#7500c0" stroke-width="3" marker-end="url(#sp)"/><text x="413" y="100" text-anchor="middle" font-size="15" font-weight="700" fill="#7500c0">Publish</text><text x="413" y="128" text-anchor="middle" font-size="12.5" fill="#444">back live</text><text x="75" y="160" text-anchor="middle" font-size="15" fill="#5e5e5e">pointer: none</text><line x1="75" y1="170" x2="75" y2="200" stroke="#a100ff" stroke-width="2" stroke-dasharray="3 5"/><text x="300" y="160" text-anchor="middle" font-size="15" fill="#5e5e5e">pointer → live version</text><line x1="300" y1="170" x2="300" y2="200" stroke="#a100ff" stroke-width="2" stroke-dasharray="3 5"/><text x="525" y="160" text-anchor="middle" font-size="15" fill="#5e5e5e">pointer kept</text><line x1="525" y1="170" x2="525" y2="200" stroke="#a100ff" stroke-width="2" stroke-dasharray="3 5"/><rect x="0" y="200" width="600" height="62" rx="10" fill="#f1e6ff" stroke="#a100ff" stroke-width="2" stroke-dasharray="6 4"/><text x="300" y="226" text-anchor="middle" font-size="17">Edit, Restore: only the draft changes</text><text x="300" y="248" text-anchor="middle" font-size="17">(draft_version +1), in every state</text><rect x="0" y="272" width="600" height="62" rx="10" fill="#fde8eb" stroke="#c8102e" stroke-width="2" stroke-dasharray="6 4"/><text x="300" y="298" text-anchor="middle" font-size="17">Delete a version: any state,</text><text x="300" y="320" text-anchor="middle" font-size="17">but never the live version (409)</text></svg></div><div><table class="t xs mx"><tr><th>Operation</th><th>Status</th><th>Pointer</th><th>published_at</th><th>Draft</th><th>Snapshots</th></tr><tr><td>Edit the draft</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#b5b5b5">–</td></tr><tr><td>Restore vN</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#b5b5b5">–</td></tr><tr><td>Publish, changed draft</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#a100ff;font-weight:800">●</td></tr><tr><td>Publish, same as live</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td></tr><tr><td>Unpublish</td><td class="c" style="color:#a100ff;font-weight:800">●</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td></tr><tr><td>Delete a version</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#b5b5b5">–</td><td class="c" style="color:#a100ff;font-weight:800">●</td></tr></table><p style="font-size:14.5px;color:#5e5e5e;margin:6px 0 0">● = changes. Publish sets <code>published_at</code> only the first time; “same as live” changes the status only if it was unpublished.</p></div></div></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/domains/articles/service.py</span></div><div class="rg"><div class="ri"><span class="rl">Edit the draft</span><span class="rp">lines 128-157</span></div><div class="ri"><span class="rl">Publish</span><span class="rp">lines 180-239</span></div><div class="ri"><span class="rl">Unpublish</span><span class="rp">lines 259-269</span></div><div class="ri"><span class="rl">Restore</span><span class="rp">lines 292-315</span></div><div class="ri"><span class="rl">Delete a version</span><span class="rp">lines 318-340</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>The pointer changes only in Publish; Unpublish only flips the status.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>7 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="8 / 14: Publish">
+<h2><small>Publish and concurrency (1/4)</small>Publish decides on a locked row, then writes everything in one transaction</h2><div class="body"><div class="cols"><div><table class="t xs"><tr><th>Order</th><th>Check</th><th>If it fails</th></tr><tr><td>1</td><td>Lock the article row (<code>FOR UPDATE</code>)</td><td>404 no such article</td></tr><tr><td>2</td><td><code>expected_draft_version</code> equals the row’s</td><td>409 <code>version_conflict</code></td></tr><tr><td>3</td><td>Title and body are not empty</td><td>422 <code>empty_content</code></td></tr><tr><td>4</td><td>Draft equals the live snapshot?</td><td>200, nothing new (idempotent)</td></tr><tr><td>5</td><td>Counter +1 · insert snapshot · move pointer, status, <code>published_at</code></td><td>all or nothing: any failure rolls back</td></tr></table></div><div><div class="lbl">The lock: <code>lock_article_for_publish</code></div><pre class="xs">SELECT a.id, a.status, a.draft_*, a.draft_version,
+       a.published_at, v.version_number, v.title, v.body, v.tags
+FROM articles a
+LEFT JOIN article_versions v ON v.id = a.current_published_version_id
+WHERE a.id = :id  FOR UPDATE OF a</pre><table class="t xs"><tr><th>The lock</th><th></th></tr><tr><td>Lasts until</td><td>COMMIT or ROLLBACK; plain reads are not blocked</td></tr><tr><td>Lock order</td><td>article row, then version rows: no deadlock</td></tr><tr><td>Decides on</td><td>the locked row, never a value read earlier</td></tr></table></div></div></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/domains/articles/</span></div><div class="rg"><div class="ri"><span class="rl">Publish steps</span><span class="rp">service.py:180-239</span></div><div class="ri"><span class="rl">Lock the row</span><span class="rp">repository.py:101-118</span></div><div class="ri"><span class="rl">Counter +1</span><span class="rp">repository.py:121-130</span></div><div class="ri"><span class="rl">Insert the snapshot</span><span class="rp">repository.py:133-149</span></div><div class="ri"><span class="rl">Move the pointer</span><span class="rp">repository.py:158-175</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>Decisions use the locked row, never a value read earlier.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>8 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="9 / 14: Two Publishes">
+<h2><small>Publish and concurrency (2/4)</small>Two Publishes at once make exactly one snapshot</h2><div class="body"><div class="lbl">The article is at v3 with draft_version 5. Both writers loaded the screen at 5 and press Publish at the same moment.</div><svg viewBox="0 0 1100 296" role="img" aria-label="Two Publishes at once: Writer X locks the row and publishes v4; Writer Y waits, then finds draft_version 6 and is refused with 409"><defs><marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5e5e5e"/></marker><marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c8102e"/></marker></defs><rect x="40" y="2" width="280" height="36" rx="9" fill="#f1e6ff" stroke="#a100ff" stroke-width="2.5"/><text x="180" y="27" text-anchor="middle" font-size="19" font-weight="800">Writer X</text><line x1="180" y1="40" x2="180" y2="290" stroke="#d8d3e0" stroke-width="2" stroke-dasharray="3 6"/><rect x="410" y="2" width="280" height="36" rx="9" fill="#e6dcff" stroke="#7500c0" stroke-width="2.5"/><text x="550" y="27" text-anchor="middle" font-size="19" font-weight="800">Article row (database)</text><line x1="550" y1="40" x2="550" y2="290" stroke="#d8d3e0" stroke-width="2" stroke-dasharray="3 6"/><rect x="780" y="2" width="280" height="36" rx="9" fill="#ececec" stroke="#111111" stroke-width="2.5"/><text x="920" y="27" text-anchor="middle" font-size="19" font-weight="800">Writer Y</text><line x1="920" y1="40" x2="920" y2="290" stroke="#d8d3e0" stroke-width="2" stroke-dasharray="3 6"/><circle cx="18" cy="72" r="14" fill="#a100ff"/><text x="18" y="78" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="40" y="47" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="180" y="68" text-anchor="middle" font-size="17">Lock the row</text><text x="180" y="88" text-anchor="middle" font-size="17">(takes the key)</text><rect x="410" y="47" width="280" height="50" rx="9" fill="#fff7d6" stroke="#b58900" stroke-width="2"/><text x="550" y="78" text-anchor="middle" font-size="17">Locked by X</text><rect x="780" y="47" width="280" height="50" rx="9" fill="#f4f4f4" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="6 4"/><text x="920" y="68" text-anchor="middle" font-size="17">Tries to lock it</text><text x="920" y="88" text-anchor="middle" font-size="17">X holds it: waits</text><line x1="323" y1="72" x2="407" y2="72" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><line x1="777" y1="72" x2="693" y2="72" stroke="#c8102e" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#ahr)"/><text x="735" y="64" text-anchor="middle" font-size="14" fill="#c8102e">blocked</text><circle cx="18" cy="134" r="14" fill="#a100ff"/><text x="18" y="140" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text><rect x="40" y="109" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="180" y="130" text-anchor="middle" font-size="17">Make v4</text><text x="180" y="150" text-anchor="middle" font-size="17">draft_version 5 → 6</text><rect x="410" y="109" width="280" height="50" rx="9" fill="#e6dcff" stroke="#7500c0" stroke-width="2"/><text x="550" y="130" text-anchor="middle" font-size="17">v4 is live</text><text x="550" y="150" text-anchor="middle" font-size="17">draft_version = 6</text><rect x="780" y="109" width="280" height="50" rx="9" fill="#f4f4f4" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="6 4"/><text x="920" y="140" text-anchor="middle" font-size="17">(still waiting)</text><line x1="323" y1="134" x2="407" y2="134" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><circle cx="18" cy="196" r="14" fill="#a100ff"/><text x="18" y="202" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">3</text><rect x="40" y="171" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="180" y="192" text-anchor="middle" font-size="17">Commit</text><text x="180" y="212" text-anchor="middle" font-size="17">give the key back</text><rect x="410" y="171" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="550" y="202" text-anchor="middle" font-size="17">Key is free</text><rect x="780" y="171" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="920" y="192" text-anchor="middle" font-size="17">Gets the key, reads</text><text x="920" y="212" text-anchor="middle" font-size="17">draft_version = 6</text><line x1="323" y1="196" x2="407" y2="196" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><line x1="693" y1="196" x2="777" y2="196" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><circle cx="18" cy="258" r="14" fill="#a100ff"/><text x="18" y="264" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">4</text><rect x="40" y="233" width="280" height="50" rx="9" fill="#e3f4ea" stroke="#0b6b3a" stroke-width="2"/><text x="180" y="254" text-anchor="middle" font-size="17">Result: one new</text><text x="180" y="274" text-anchor="middle" font-size="17">version, v4</text><rect x="780" y="233" width="280" height="50" rx="9" fill="#fde8eb" stroke="#c8102e" stroke-width="2"/><text x="920" y="254" text-anchor="middle" font-size="17">Expected 5, found 6</text><text x="920" y="274" text-anchor="middle" font-size="17">→ 409, no new version</text></svg></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/domains/articles/</span></div><div class="rg"><div class="ri"><span class="rl">Lock the row</span><span class="rp">repository.py:101-118</span></div><div class="ri"><span class="rl">Check after the lock</span><span class="rp">service.py:203-204</span></div><div class="ri"><span class="rl">Publish steps</span><span class="rp">service.py:180-239</span></div><div class="ri"><span class="rl">Test: two Publishes</span><span class="rp">backend/tests/integration/test_publish_concurrency.py:15</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>Y is refused not for being late, but because the row changed while it waited.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>9 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="10 / 14: Edits">
+<h2><small>Publish and concurrency (3/4)</small>Edits take no lock; a save from a stale screen is refused with 409</h2><div class="body"><pre class="xs" style="font-size:15px">UPDATE articles SET …, draft_version = draft_version + 1
+WHERE id = :id AND draft_version = :expected
+RETURNING draft_version</pre><svg viewBox="0 0 1100 296" role="img" aria-label="Two edits: Writer A saves first; Writer B saves with the old version and gets 409"><defs><marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5e5e5e"/></marker><marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c8102e"/></marker></defs><rect x="40" y="2" width="280" height="36" rx="9" fill="#f1e6ff" stroke="#a100ff" stroke-width="2.5"/><text x="180" y="27" text-anchor="middle" font-size="19" font-weight="800">Writer A</text><line x1="180" y1="40" x2="180" y2="290" stroke="#d8d3e0" stroke-width="2" stroke-dasharray="3 6"/><rect x="410" y="2" width="280" height="36" rx="9" fill="#e6dcff" stroke="#7500c0" stroke-width="2.5"/><text x="550" y="27" text-anchor="middle" font-size="19" font-weight="800">Article row (database)</text><line x1="550" y1="40" x2="550" y2="290" stroke="#d8d3e0" stroke-width="2" stroke-dasharray="3 6"/><rect x="780" y="2" width="280" height="36" rx="9" fill="#ececec" stroke="#111111" stroke-width="2.5"/><text x="920" y="27" text-anchor="middle" font-size="19" font-weight="800">Writer B</text><line x1="920" y1="40" x2="920" y2="290" stroke="#d8d3e0" stroke-width="2" stroke-dasharray="3 6"/><circle cx="18" cy="72" r="14" fill="#a100ff"/><text x="18" y="78" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">1</text><rect x="40" y="47" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="180" y="68" text-anchor="middle" font-size="17">Opens the screen</text><text x="180" y="88" text-anchor="middle" font-size="17">sees v5</text><rect x="410" y="47" width="280" height="50" rx="9" fill="#e6dcff" stroke="#7500c0" stroke-width="2"/><text x="550" y="78" text-anchor="middle" font-size="17">draft_version = 5</text><rect x="780" y="47" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="920" y="68" text-anchor="middle" font-size="17">Opens the screen</text><text x="920" y="88" text-anchor="middle" font-size="17">sees v5</text><line x1="407" y1="72" x2="323" y2="72" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><text x="365" y="64" text-anchor="middle" font-size="14" fill="#5e5e5e">reads</text><line x1="693" y1="72" x2="777" y2="72" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><text x="735" y="64" text-anchor="middle" font-size="14" fill="#5e5e5e">reads</text><circle cx="18" cy="134" r="14" fill="#a100ff"/><text x="18" y="140" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">2</text><rect x="40" y="109" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="180" y="140" text-anchor="middle" font-size="17">Saves, expecting 5</text><rect x="410" y="109" width="280" height="50" rx="9" fill="#e3f4ea" stroke="#0b6b3a" stroke-width="2"/><text x="550" y="130" text-anchor="middle" font-size="17">5 matches → saved</text><text x="550" y="150" text-anchor="middle" font-size="17">draft_version = 6</text><rect x="780" y="109" width="280" height="50" rx="9" fill="#f4f4f4" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="6 4"/><text x="920" y="140" text-anchor="middle" font-size="17">(still editing)</text><line x1="323" y1="134" x2="407" y2="134" stroke="#5e5e5e" stroke-width="2.5" marker-end="url(#ahg)"/><circle cx="18" cy="196" r="14" fill="#a100ff"/><text x="18" y="202" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">3</text><rect x="410" y="171" width="280" height="50" rx="9" fill="#fde8eb" stroke="#c8102e" stroke-width="2"/><text x="550" y="192" text-anchor="middle" font-size="17">5 matches no row</text><text x="550" y="212" text-anchor="middle" font-size="17">(it is 6 now)</text><rect x="780" y="171" width="280" height="50" rx="9" fill="#ffffff" stroke="#8a8a8a" stroke-width="2"/><text x="920" y="202" text-anchor="middle" font-size="17">Saves, expecting 5</text><line x1="777" y1="196" x2="693" y2="196" stroke="#c8102e" stroke-width="2.5" marker-end="url(#ahr)"/><circle cx="18" cy="258" r="14" fill="#a100ff"/><text x="18" y="264" text-anchor="middle" font-size="16" font-weight="800" fill="#fff">4</text><rect x="410" y="233" width="280" height="50" rx="9" fill="#fde8eb" stroke="#c8102e" stroke-width="2"/><text x="550" y="254" text-anchor="middle" font-size="17">Answers 409</text><text x="550" y="274" text-anchor="middle" font-size="17">with version 6</text><rect x="780" y="233" width="280" height="50" rx="9" fill="#e3f4ea" stroke="#0b6b3a" stroke-width="2"/><text x="920" y="254" text-anchor="middle" font-size="17">Screen keeps B’s text</text><text x="920" y="274" text-anchor="middle" font-size="17">offers Resubmit</text><line x1="693" y1="258" x2="777" y2="258" stroke="#c8102e" stroke-width="2.5" marker-end="url(#ahr)"/><text x="735" y="250" text-anchor="middle" font-size="14" fill="#c8102e">409</text></svg></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/domains/articles/</span></div><div class="rg"><div class="ri"><span class="rl">Conditional UPDATE</span><span class="rp">repository.py:60-77</span></div><div class="ri"><span class="rl">Edit: service</span><span class="rp">service.py:128-157</span></div><div class="ri"><span class="rl">Test: stale edit</span><span class="rp">backend/tests/integration/test_optimistic_concurrency.py:13</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>No lock is held while someone types; the version number decides.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>10 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="11 / 14: Restore and delete">
+<h2><small>Publish and concurrency (4/4)</small>Restore never changes what readers see, and the live version can’t be deleted</h2><div class="body"><table class="t sm"><tr><th></th><th>Restore</th><th>Delete a version</th></tr><tr><td>Does</td><td>Copies a snapshot into the draft columns (one UPDATE)</td><td>Removes one snapshot row, after the same row lock as Publish</td></tr><tr><td>Never changes</td><td>Snapshots, status, pointer, <code>published_at</code></td><td>The live version: <span class="badge red">409</span> <code>version_is_live</code>, also after Unpublish</td></tr><tr><td>Check</td><td><code>expected_draft_version</code> → 404 or 409</td><td>Live? → 409. Second defence: foreign key <code>ON DELETE RESTRICT</code> (23503 → 409)</td></tr><tr><td>Readers see</td><td>Nothing, until the writer presses Publish (a new version)</td><td>Nothing changes</td></tr><tr><td>SQL</td><td><pre class="xs" style="font-size:13px">UPDATE articles SET draft_title = v.title, draft_body = v.body,
+       draft_tags = v.tags, draft_version = articles.draft_version + 1
+FROM article_versions v
+WHERE articles.id = :id AND v.article_id = :id AND v.version_number = :n
+  AND articles.draft_version = :expected</pre></td><td><pre class="xs" style="font-size:13px">-- after the same row lock as Publish, and the live check
+DELETE FROM article_versions
+WHERE article_id = :id AND version_number = :n</pre></td></tr></table></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/domains/articles/</span></div><div class="rg"><div class="ri"><span class="rl">Restore: SQL</span><span class="rp">repository.py:242-263</span></div><div class="ri"><span class="rl">Restore: service</span><span class="rp">service.py:292-315</span></div><div class="ri"><span class="rl">Delete: SQL</span><span class="rp">repository.py:266-277</span></div><div class="ri"><span class="rl">Delete: service</span><span class="rp">service.py:318-340</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>Readers see restored text only after the writer presses Publish.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>11 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="12 / 14: API">
+<h2><small>API list</small>Actions are commands, and every conflict gets a precise status code</h2>
+<div class="body">
+<table class="t xxs"><tr><th>Method and path</th><th>Purpose</th><th>OK</th><th>Main errors</th></tr>
+<tr><td><code>POST /articles</code></td><td>Create; a taken slug gets <code>-2</code>, <code>-3</code></td><td>201</td><td>409 slug_conflict (every retry lost), 422</td></tr>
+<tr><td><code>GET /articles</code> · <code>/{id}</code></td><td>List (newest first, ≤100) · detail with the draft</td><td>200</td><td>404, 422</td></tr>
+<tr><td><code>PATCH /articles/{id}</code></td><td>Partial draft edit; <code>expected_draft_version</code> required; no slug</td><td>200</td><td>404, 409 version_conflict, 422</td></tr>
+<tr><td><code>POST …/{id}/publish</code></td><td>Publish (body: <code>expected_draft_version</code>)</td><td>201 / 200 unchanged</td><td>404, 409, 422 empty_content, 503 busy</td></tr>
+<tr><td><code>POST …/{id}/unpublish</code></td><td>Take down (no version check)</td><td>200</td><td>404, 409 not_published, 503 busy</td></tr>
+<tr><td><code>GET …/{id}/versions</code> · <code>/{n}</code></td><td>History (no body, with <code>is_live</code>) · one version</td><td>200</td><td>404</td></tr>
+<tr><td><code>POST …/versions/{n}/restore</code></td><td>Copy into the draft; does not publish</td><td>200</td><td>404, 409 version_conflict</td></tr>
+<tr><td><code>DELETE …/versions/{n}</code></td><td>Delete a version (no version check)</td><td>204</td><td>404, 409 version_is_live, 503 busy</td></tr>
+<tr><td><code>GET /ai/status</code> · <code>POST /ai/draft</code></td><td>Optional extra: stream a proposed body (SSE); writes nothing</td><td>200</td><td>401, 422, 429, 502, 503</td></tr>
+<tr><td><code>GET /public/articles</code> · <code>/{slug}</code></td><td>Published list · live snapshot (one JOIN); no sign-in</td><td>200</td><td>404 (same body for every case)</td></tr></table>
+</div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/</span></div><div class="rg"><div class="ri"><span class="rl">Writer endpoints</span><span class="rp">api/v1/routes/articles.py:36-186</span></div><div class="ri"><span class="rl">Public endpoints</span><span class="rp">api/v1/routes/public.py:18-41</span></div><div class="ri"><span class="rl">AI endpoints</span><span class="rp">api/v1/routes/ai.py:50, 67</span></div><div class="ri"><span class="rl">Sign-in check</span><span class="rp">core/security.py:30</span></div><div class="ri"><span class="rl">Router protected</span><span class="rp">main.py:151</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>401 before 404 and 422 · the version check is a body field.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>12 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="13 / 14: Tests">
+<h2><small>Test plan</small>Every rule has automated tests on a real database</h2>
+<div class="body"><div class="cols" style="grid-template-columns:1.35fr 1fr">
+<div><table class="t xs"><tr><th>Rule</th><th>App</th><th>DB</th><th>Tests</th></tr>
+<tr><td>Snapshots are immutable</td><td>●</td><td>●</td><td>34</td></tr>
+<tr><td>Publish is atomic</td><td>●</td><td>●</td><td>16</td></tr>
+<tr><td>Live version cannot be deleted</td><td>●</td><td>●</td><td>17</td></tr>
+<tr><td>Restore keeps history intact</td><td>●</td><td>○</td><td>9</td></tr>
+<tr><td>Concurrent edits are detected</td><td>●</td><td>○</td><td>36</td></tr>
+<tr><td>History survives Unpublish</td><td>●</td><td>●</td><td>7</td></tr>
+<tr><td>Idempotent Publish</td><td>●</td><td>○</td><td>8</td></tr>
+<tr><td>Slug collision handling</td><td>●</td><td>●</td><td>41</td></tr>
+<tr><td>Public side</td><td>●</td><td>○</td><td>19</td></tr>
+<tr><td>Basic authentication</td><td>●</td><td>○</td><td>78</td></tr>
+<tr><td>AI body generation (extra)</td><td>●</td><td>○</td><td>45</td></tr></table>
+<p style="font-size:15px;color:var(--muted);margin:4px 0 0">● enforced there. Counts are the tests in the files covering each rule.</p></div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div class="card sm tc" style="padding:8px"><span class="num" style="font-size:40px">364</span> <span style="font-size:17px">backend tests, real PostgreSQL</span></div>
+<div class="card sm tc" style="padding:8px"><span class="num" style="font-size:40px">29</span> <span style="font-size:17px">frontend tests (Vitest)</span></div>
+<div class="card sm tc" style="padding:8px"><span class="num" style="font-size:40px">21</span> <span style="font-size:17px">real-browser tests (Playwright)</span></div>
+
+</div>
+</div></div>
+<div class="ref"><div class="rh">Code<span>backend/tests/</span></div><div class="rg"><div class="ri"><span class="rl">Two Publishes</span><span class="rp">integration/test_publish_concurrency.py:15</span></div><div class="ri"><span class="rl">Schema guards</span><span class="rp">integration/test_schema_constraints.py:43</span></div><div class="ri"><span class="rl">Restore</span><span class="rp">integration/test_restore.py:39</span></div><div class="ri"><span class="rl">Delete a version</span><span class="rp">integration/test_delete_version.py:23</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>364 + 29 + 21 tests; the backend tests run on a real PostgreSQL.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>13 / 14</span></div>
+</section>
+<section class="slide sw" aria-roledescription="slide" aria-label="14 / 14: Extras">
+<h2><small>Extras</small>Extras are safe by default: AI is off, and every writer route needs sign-in</h2><div class="body"><table class="t sm"><tr><th>Extra</th><th>What it does</th><th>Why it is safe</th></tr><tr><td>AI draft helper<br>(outside the brief)</td><td><code>POST /ai/draft</code> streams a proposed body (SSE); the editor’s “Generate with AI” button calls it through a Next.js route handler</td><td>Off by default (<code>AI_ENABLED</code>); refuses to start without a key; 5 requests a minute; saves and publishes nothing; tested with a fake generator</td></tr><tr><td>Secure by default</td><td>The whole writer router has <code>dependencies=[Depends(require_basic_auth)]</code></td><td>A new route is protected automatically; a test walks every route</td></tr><tr><td>Idempotent Publish</td><td>An unchanged draft answers 200 and makes no new version</td><td>Repeating a Publish creates nothing new</td></tr><tr><td>Slug collisions</td><td>A taken slug becomes <code>-2</code>, <code>-3</code></td><td>A race between two creates is retried</td></tr><tr><td>Real-browser tests</td><td>21 Playwright tests drive the screens (<code>make e2e</code>)</td><td>Run on a throwaway Docker system</td></tr></table></div>
+<div class="ref"><div class="rh">Code<span>backend/src/app/</span></div><div class="rg"><div class="ri"><span class="rl">AI endpoints</span><span class="rp">api/v1/routes/ai.py:50, 67</span></div><div class="ri"><span class="rl">Claude call</span><span class="rp">domains/ai/generator.py:31</span></div><div class="ri"><span class="rl">5 requests a minute</span><span class="rp">domains/ai/limiter.py:11</span></div><div class="ri"><span class="rl">Off by default</span><span class="rp">core/config.py:30-34</span></div><div class="ri"><span class="rl">Idempotent Publish</span><span class="rp">domains/articles/service.py:77-85, 208-220</span></div><div class="ri"><span class="rl">Slug collisions</span><span class="rp">domains/articles/service.py:44-58, 108-125</span></div><div class="ri"><span class="rl">Sign-in on every route</span><span class="rp">main.py:151, core/security.py:30</span></div><div class="ri"><span class="rl">AI button (frontend)</span><span class="rp">frontend/…/articles/ai-generate-bar.tsx</span></div></div></div>
+<div class="sowhat"><b>So what</b><span>AI only proposes text; it saves and publishes nothing.</span></div>
+<div class="foot"><span>Northbeam Docs Studio</span><span>14 / 14</span></div>
+</section>
+</div>
+</main>
+<nav class="bar" aria-label="Slide controls">
+  <button type="button" id="prev" aria-label="Previous slide">&larr;</button>
+  <span class="count" id="count" aria-live="polite"></span>
+  <button type="button" id="next" aria-label="Next slide">&rarr;</button>
+  <button type="button" id="fbtn">Full screen (F)</button>
+</nav>
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var stage = document.getElementById("stage");
+  var frame = document.getElementById("frame");
+  var count = document.getElementById("count");
+  var cur = 0;
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1280, (window.innerHeight - 48) / 720);
+    stage.style.transform = "scale(" + s + ")";
+    frame.style.width = 1280 * s + "px";
+    frame.style.height = 720 * s + "px";
+  }
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (el, k) { el.classList.toggle("active", k === cur); });
+    count.textContent = (cur + 1) + " / " + slides.length;
+    if (history.replaceState) { history.replaceState(null, "", "#" + (cur + 1)); }
+  }
+  function toggleFull() {
+    if (document.fullscreenElement) { document.exitFullscreen(); }
+    else if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen(); }
+  }
+  document.getElementById("prev").onclick = function () { show(cur - 1); };
+  document.getElementById("next").onclick = function () { show(cur + 1); };
+  document.getElementById("fbtn").onclick = toggleFull;
+  document.addEventListener("keydown", function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) { return; }
+    var k = e.key;
+    if (k === "ArrowRight" || k === "PageDown" || k === " " || k === "Enter") { e.preventDefault(); show(cur + 1); }
+    else if (k === "ArrowLeft" || k === "PageUp" || k === "Backspace") { e.preventDefault(); show(cur - 1); }
+    else if (k === "Home") { show(0); }
+    else if (k === "End") { show(slides.length - 1); }
+    else if (k === "f" || k === "F") { toggleFull(); }
+  });
+  window.addEventListener("resize", fit);
+  fit();
+  var start = parseInt((location.hash || "").slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>

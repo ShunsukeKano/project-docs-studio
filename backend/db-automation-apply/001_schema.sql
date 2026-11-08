@@ -71,6 +71,18 @@ ALTER TABLE articles
 -- ---------------------------------------------------------------------------
 
 -- Snapshots are immutable: reject every UPDATE (DELETE stays allowed; the foreign key protects the live one).
+--
+-- How the rejection works:
+--   1. The trigger below is BEFORE UPDATE ... FOR EACH ROW, so PostgreSQL calls the function
+--      before it changes any row of article_versions.
+--   2. The function never returns NEW. It raises an exception every time (no condition, no column
+--      list), so the UPDATE statement is cancelled and the whole transaction rolls back. Nothing is
+--      partly updated, and the caller gets a database error, never a success.
+--   3. It applies to every column, every row and every client, including a manual psql session
+--      and any future code. Only the table owner or a superuser can switch it off
+--      (ALTER TABLE ... DISABLE TRIGGER); the application never does.
+--   4. It does not cover DELETE (allowed on purpose: a writer may delete a version that is not
+--      live) or TRUNCATE (row triggers do not fire for TRUNCATE; see the separate trigger below).
 CREATE FUNCTION forbid_version_update() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog AS $$
 BEGIN

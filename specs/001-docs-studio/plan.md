@@ -73,7 +73,7 @@ specs/001-docs-studio/
 ```text
 compose.yaml                     # local run: db, db-test, migrate, backend, frontend (`docker compose up --build`)
 .env.example                     # local-only placeholder values for compose and the apps
-README.md                        # assessor path, how to run, data model and why, trade-offs, status table (draft exists; finished at the end)
+README.md                        # assessor path, how to run, data model and why, status table (draft exists; finished at the end)
 Makefile                         # setup, dev, test, check-api, check-spec-first
 scripts/
 └── check-spec-first.sh          # verifies spec.md was committed before backend/ and frontend/ files

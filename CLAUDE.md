@@ -8,7 +8,7 @@ A content management service for internal writers (an API plus a minimal UI) and
 | `frontend/` | Next.js 16 (App Router). Details in `frontend/CLAUDE.md` |
 | `docs/` | Requirements and architecture, shared by the frontend and backend. Canadian English; the Japanese versions are in `docs/ja/` |
 | `specs/` | Spec Kit artifacts: `specs/001-docs-studio/` holds `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` and `tasks.md` |
-| `README.md` | For assessors: the deployed address, how to run it, the data model and why, trade-offs, and a table of feature status |
+| `README.md` | For assessors: the deployed address, how to run it, the data model and why, and a table of feature status |
 
 The rules of this project are in `.specify/memory/constitution.md`. Read it first.
 

@@ -135,7 +135,7 @@ The interface is **minimal and stylish, built with Tailwind CSS**: a neutral col
    - spec: the requirements and invariants in your own words. It must cover these edge cases: Publish atomicity, protecting the live version from deletion, non-destructive restore and concurrent editing.
    - plan: the data model, API design and key design decisions such as optimistic concurrency.
    - tasks: the work broken down in implementation order.
-3. **README.md**: starts with the assessor path (the deployed Cloud Run URL; the Basic authentication credentials are shared outside the repository), then how to run it locally / a description of the data model / why that model was chosen / a paragraph (at least) on a design trade-off made under the time limit / improvements if there were more time / a table of features with their status (done / partial / not done) and how each missing one would be built. It also states that the Cloud Run files are optional and were not verified as part of the assessed scope.
+3. **README.md**: starts with the assessor path (how to reach the deployed Cloud Run site: its address and the Basic authentication credentials are shared together, outside the repository, and the address is not written in the README), then how to run it locally / a description of the data model / why that model was chosen / a table of features with their status (done / partial / not done) and how each missing one would be built. It also states that the Cloud Run files are optional.
 4. **Automated tests**: runnable with a single command.
 
 ## 9. Recommended data model (not mandatory)

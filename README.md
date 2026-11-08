@@ -2,25 +2,51 @@
 
 A small content management service for internal writers (an API plus a minimal UI) and a public documentation site where only published articles can be read. Built with FastAPI, PostgreSQL, Next.js and Tailwind CSS.
 
+**The idea that shapes the design:** a writer can edit freely without ever changing what readers see, and what readers see is always a frozen snapshot of what was last published. A draft and published content never share a row; every publish creates an immutable, numbered snapshot inside one atomic transaction.
+
 ## For assessors: start here
 
-There are two ways to check the work. Use whichever you prefer:
+There are two ways to check the work. Please use whichever you prefer.
 
-1. **On your own machine with Docker** (nothing else to install): see "Running it locally" below.
-2. **On the deployed site** (Cloud Run), because assessors cannot reach the authors' database:
+| | On your own machine | On the deployed site (Cloud Run) |
+|---|---|---|
+| What you need | Docker only | A browser |
+| How | `cp .env.example .env`, then `docker compose up --build`, then open `http://localhost:3000` | The address, and the writer username and password, are **sent to assessors together, outside this repository** (nothing is written here) |
+| Public pages | `/docs` | `/docs` (no sign-in) |
+| Writer area | `/studio`, **no login by default** | `/studio`, asks for the username and password (HTTP Basic authentication) |
+| Notes | Details in "Running it locally" below | The database is a small Cloud SQL instance that may be stopped or deleted after the assessment, so the site can go away. Assessors cannot reach the authors' database, which is why the deployed site exists |
 
-- **URL**: https://docs-studio-web-cacovrwumq-an.a.run.app (public pages at `/docs`, writer area at `/studio`). The API is at https://docs-studio-api-cacovrwumq-an.a.run.app. The database is a small Cloud SQL instance that may be stopped or deleted after the assessment, so the site can go away.
-- **Writer area** (`/studio`) on the deployed site asks for a username and password (HTTP Basic authentication). The credentials are **shared outside this repository**. The public pages (`/docs`) need no sign-in. A local Docker run has **no login by default** (see below).
-- **What was checked on the deployed site**: by the author from outside, the public list and the "not found" answers, that the writer area asks for credentials and the API refuses wrong ones, the production security headers, and that the API reaches its database; by the owner, who holds the credentials, the writer scenarios of `specs/001-docs-studio/quickstart.md` (create, publish, restore and so on), the AI button against the real model and the browser's sign-in box (reported by the owner, not recorded in detail). The same scenarios were also run on the local Docker system with scripts, and the results are in `specs/001-docs-studio/quickstart-results.md`.
-- The Cloud Run file (`cloudbuild.yaml`) is optional and is **not part of the assessed scope**; it was built and deployed once by hand (2026-11-01) with the files in this repository. The Dockerfiles are also used by the local Docker run.
+**How to confirm** (about five minutes): publish an article; edit the draft and check the public page still shows the published text; take it down and check the public page returns "not found"; restore an old version; try to delete the live version; save from two browser tabs to see the conflict message.
 
-Things worth trying: publish an article, edit the draft and check the public page still shows the published text, take it down and check the public page returns "not found", restore an old version, try to delete the live version, and save from two browser tabs to see the conflict message.
+The Cloud Run files (`cloudbuild.yaml`) are optional. The Dockerfiles are also used by the local Docker run.
 
-## What it does
+## Status at a glance
 
-The idea that shapes the design: **a writer can edit freely without ever changing what readers see, and what readers see is always a frozen snapshot of what was last published.** A draft and published content never share a row; every publish creates an immutable, numbered snapshot inside one atomic transaction.
+| Area | Status | Evidence |
+|---|---|---|
+| Backend, web app, local Docker run, Cloud Run deployment | Built and working | See "What was checked, and how" |
+| Backend tests | 367, on a real PostgreSQL | `make test`; the same suite passes in Docker with `docker compose --profile test run --rm test` |
+| Frontend tests | 29 (Vitest) | `make test` |
+| Browser tests | 21 (Playwright), against a throwaway Docker system | `make e2e`; separate from `make test` |
+| Continuous integration | GitHub Actions, on every push to `main` and every pull request | `.github/workflows/ci.yml`: backend checks on a PostgreSQL 17 service, frontend and API-contract checks, and the spec-first check. It does **not** run the browser tests and does **not** gate the Cloud Build deploy |
+| Every feature | See the table at the end | "Features and their status" |
 
-> **Status: the backend, the web app, the local Docker run and the Cloud Run deployment are built and working.** 367 backend tests (on a real PostgreSQL) and 29 frontend tests pass with `make test`, and the same backend suite passes inside Docker with `docker compose --profile test run --rm test`. The writer screens were driven end to end in a real browser (headless Chrome) against the running system, and those flows are now kept as 21 automated Playwright tests (`make e2e`, which runs against a throwaway Docker system and is separate from `make test`): create, save and publish in one step, history, Restore, delete, Unpublish, the edit-conflict screen with "Resubmit", and (with a stand-in for the model) the streamed AI draft. The deployed site was checked from outside (public pages, 404s, sign-in required for the writer area, security headers) and its owner confirmed in a browser that it runs; the quickstart scenarios themselves were run on the local Docker system. After that, the owner reported running the quickstart scenarios on the deployed site, trying the AI button against the real Claude model, seeing the browser's own sign-in box, and checking the "first article in under three minutes" goal; those four were done by the owner and are **not recorded in detail** here (no timings or transcripts). GitHub Actions (`.github/workflows/ci.yml`) runs the backend checks on a PostgreSQL 17 service, the frontend and API-contract checks, and the spec-first check on every push to `main` and every pull request; it does not run the browser tests, and it does not gate the Cloud Build deploy. The table at the end gives the status of every feature.
+The 21 browser tests cover: create, save and publish in one step, history, Restore, delete, Unpublish, the edit-conflict screen with "Resubmit", and (with a stand-in for the model) the streamed AI draft.
+
+## What was checked, and how
+
+| What was checked | How | Notes |
+|---|---|---|
+| 367 backend and 29 frontend tests | Automated | `make test`; also run by GitHub Actions |
+| The ten quickstart scenarios, on the local Docker system | Scripts | Results in `specs/001-docs-studio/quickstart-results.md` |
+| The writer screens, end to end in a real browser (headless Chrome) | Automated | Kept as the 21 Playwright tests (`make e2e`) |
+| The deployed site from outside: the public list and the "not found" answers, that the writer area asks for credentials and the API refuses wrong ones, the production security headers, and that the API reaches its database | By hand, not signed in | |
+| The deployed AI settings (the key comes from Secret Manager and the service starts), and the AI stream with a stand-in for the model | By hand and by script | `specs/001-docs-studio/quickstart-results.md`, scenario 12 |
+| That the deployed site runs | By hand, signed in | |
+| The writer scenarios of `specs/001-docs-studio/quickstart.md` on the deployed site | By hand, signed in | **No detailed record** (no timings or transcripts) |
+| The AI button against the real Claude model on the deployed site | By hand, signed in | **No detailed record** |
+| The browser's own sign-in box | By hand | **No detailed record** |
+| The goal "first article published in under three minutes" | By hand | **No detailed record** |
 
 ## How the work was specified (spec first)
 
@@ -46,7 +72,7 @@ cp .env.example .env        # the writer login is off by default for a local run
 docker compose up --build   # starts PostgreSQL, applies the schema, then the API (port 8000) and the web app (port 3000)
 ```
 
-This was run from a clean copy of the repository (no installed dependencies, no `.env`) and the whole system came up in well under a minute with warm caches. The results of the ten quickstart scenarios are in `specs/001-docs-studio/quickstart-results.md`.
+This was run from a clean copy of the repository (no installed dependencies, no `.env`) and the whole system came up in well under a minute with warm caches.
 
 The development database lives in a Docker volume, so its data survives `docker compose down`; only `docker compose down -v` removes it. The test database is in memory and is reset by every run.
 
@@ -91,36 +117,23 @@ Two tables (the DDL is `backend/db-automation-apply/001_schema.sql`; the explana
 - A per-article counter (`last_version_number`) numbers snapshots, so a number is never reused even after a deletion.
 - It follows the recommended model in the assignment, with two additions: `last_version_number`, and the constraints above.
 
-## Design trade-offs made under the time limit
+## Optional extras
 
-The time limit shaped four decisions. In short: reads are kept simple and always correct instead of fast, authentication is kept to the smallest thing that protects the writer API, tests run on a real database at the cost of needing a reachable PostgreSQL, and deployment work is kept out of the assessed scope. In more detail:
+**AI body generation** (off by default; **switched on for the deployed site**). In the editor, the "Generate with AI" button (always visible; disabled with a note when the feature is off) asks Claude (`claude-sonnet-4-6`, changeable with `ANTHROPIC_MODEL`) to write the body from the title, tags and any notes already entered.
 
-- **Correctness over speed of reads.** Public pages are rendered dynamically on every request and nothing is cached. That costs some read performance, but an unpublished article disappears on the next request, which the assignment's "404 for taken-down articles" requires, and a caching layer is out of scope anyway.
-- **Authentication added, but kept minimal.** The assignment treats authentication as out of scope, but the service is exposed on the internet, so the writer area uses one shared username and password (HTTP Basic). It is checked in the API itself, so calling the API directly is protected too. It is one explicit switch (`BASIC_AUTH_ENABLED`): required in production, and off by default for a local run so the project behaves as the assignment describes (no authentication). There are no accounts, roles or logout.
-- **A real database in tests, and Docker for the local run.** Tests run on a real `_test` database (never mocks) because the guarantees live in the database, and `docker compose up --build` gives anyone a working system from a fresh checkout with only Docker installed. The trade-off is that running locally needs Docker (or a PostgreSQL you install yourself), and the tests need that database to be reachable; the deployed site needs nothing installed.
-- **Cloud Run deployment is low priority and outside the assessed scope.** It was done last, first by hand and then with automatic deployment: a push to `main` on GitHub builds both Dockerfiles with Cloud Build and deploys them to Cloud Run (two triggers, set up in the Cloud Run console, checked after the first push). The database schema is not migrated automatically: after a schema change, run the migration job by hand (`gcloud run jobs execute docs-studio-api-migrate --region asia-northeast1`). It runs on a small instance, so it may be stopped after the assessment.
-
-## Optional extras (outside the assessed scope)
-
-- **AI body generation** (off by default; **switched on for the deployed site**). In the editor, the "Generate with AI" button (always visible; disabled with a note when the feature is off) asks Claude (`claude-sonnet-4-6`, changeable with `ANTHROPIC_MODEL`) to write the body from the title, tags and any notes already entered. It returns a **proposal only**: the text appears in the body field progressively as it is written (a Stop button keeps what has arrived), and nothing is saved or published until the writer saves. To try it, set `AI_ENABLED=true` and your own `ANTHROPIC_API_KEY` in `.env` (never commit the key). Guards: off unless switched on (and the service refuses to start if it is on without a key), input length limits, a token cap, five requests a minute per instance, a generic error message that gives no internal detail, and no logging of the key or the text. On a local run the key lives in `.env` (which Git ignores); on Google Cloud it is kept in Secret Manager (`anthropic-api-key`) and handed to the API service as `ANTHROPIC_API_KEY`, with `AI_ENABLED=true` set on the service (no key is in the code, the image or any file in this repository; the service settings are kept across the automatic deploys, and `backend/cloudbuild.yaml` maps the secret only when built with `_AI_ENABLED=true`). On the deployed site only a signed-in writer can use it, so the cost is limited to people who have the writer credentials. Cost is about 2 to 3 cents a draft and is capped by the prepaid credit on your account. The tests use a fake model and never call the API. The author checked the deployed settings (the key comes from Secret Manager and the service starts) and the stream with a stand-in for the model (see `specs/001-docs-studio/quickstart-results.md`, scenario 12); the owner reports trying it against the real model on the deployed site, which is not recorded in detail.
-
-## Images
-
-The photo in the web app (the public list banner) is from Unsplash, which licenses it for free use. It was downloaded once and is kept in `frontend/public/images/`, so the app never loads an image from another site (the Content Security Policy only allows `'self'` images, and a test checks that no source file names an image host).
-
-## Improvements with more time
-
-- Per-person accounts with a proper sign-in and sign-out instead of one shared Basic credential.
-- Save as Version and a Diff View between two versions.
-- Rate limiting on the sign-in challenge, and an audit log of who published or deleted what.
-- Real pagination (cursor-based) and a search over published articles.
-- A cache for public pages with explicit invalidation on publish and unpublish, once the 404 requirement can be proven to hold with it.
-- Tune the AI draft helper's prompt and measure its cost on real articles (it works against the real model on the deployed site, as reported by the owner; see "Optional extras" below).
-- Make the deploy wait for CI (today a push to `main` starts both at once), run the browser tests in CI, and manage Cloud Run and Cloud SQL as code.
+| | |
+|---|---|
+| What it returns | A **proposal only**. The text appears in the body field progressively as it is written (a Stop button keeps what has arrived), and nothing is saved or published until the writer saves |
+| To try it locally | Set `AI_ENABLED=true` and your own `ANTHROPIC_API_KEY` in `.env` (never commit the key) |
+| Guards | Off unless switched on (the service refuses to start if it is on without a key), input length limits, a token cap, five requests a minute per instance, a generic error message that gives no internal detail, and no logging of the key or the text |
+| Where the key lives | On a local run, in `.env` (which Git ignores). On Google Cloud, in Secret Manager (`anthropic-api-key`), handed to the API service as `ANTHROPIC_API_KEY`, with `AI_ENABLED=true` set on the service. No key is in the code, the image or any file in this repository. The service settings are kept across the automatic deploys, and `backend/cloudbuild.yaml` maps the secret only when built with `_AI_ENABLED=true` |
+| Who can use it | On the deployed site, only a signed-in writer, so the cost is limited to people who have the writer credentials |
+| Cost | About 2 to 3 cents a draft, capped by the prepaid credit on your account |
+| Tests | A fake model; the tests never call the API |
 
 ## Features and their status
 
-Status values: **Done**, **Partial**, **Not done**. *Done* means built and covered by automated tests; for features with a screen, the screen was also driven in a real browser (see the status note above). For anything not done, the last column says how it would be built. The task numbers are in `specs/001-docs-studio/tasks.md`.
+Status values: **Done**, **Partial**, **Not done**. *Done* means built and covered by automated tests; for features with a screen, the screen was also driven in a real browser (see "What was checked, and how"). For anything not done, the last column says how it would be built. The task numbers are in `specs/001-docs-studio/tasks.md`.
 
 | Feature | Status | If not done: how it would be built |
 |---|---|---|
@@ -133,10 +146,11 @@ Status values: **Done**, **Partial**, **Not done**. *Done* means built and cover
 | Writer area protected by Basic authentication (required in production, off by default locally) | Done | n/a |
 | Optional: Idempotent Publish | Done | n/a |
 | Optional: Slug collision handling | Done | n/a |
-| Extra (outside the assessed scope): AI body generation with Claude | Done and switched on for the deployed site; tested with a fake model; the owner reports it works with the real model | n/a |
+| Extra: AI body generation with Claude | Done and switched on for the deployed site; tested with a fake model | n/a |
 | Automated tests for every invariant (INV-1 to INV-6) | Done | n/a |
+| Continuous integration (GitHub Actions) | Done; does not run the browser tests and does not gate the deploy | n/a |
 | Local run with Docker Compose (`docker compose up --build`) | Done | n/a |
-| Cloud Run deployment (with automatic deploys from GitHub) | Done (the owner ran the writer scenarios on it) | Build with `cloudbuild.yaml`; create Cloud SQL, Artifact Registry, Secret Manager and the service accounts by hand (Phase 12, low priority) |
+| Cloud Run deployment (with automatic deploys from GitHub) | Done | n/a. It was built with `cloudbuild.yaml`, and Cloud SQL, Artifact Registry, Secret Manager and the service accounts were created by hand (low priority) |
 
 ## Repository layout
 

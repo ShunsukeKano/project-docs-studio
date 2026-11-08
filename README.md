@@ -20,7 +20,7 @@ There are two ways to check the work. Please use whichever you prefer.
 
 The Cloud Run files (`cloudbuild.yaml`) are optional. The Dockerfiles are also used by the local Docker run.
 
-## Status at a glance
+## Summary
 
 | Area | Status | Evidence |
 |---|---|---|
@@ -29,9 +29,30 @@ The Cloud Run files (`cloudbuild.yaml`) are optional. The Dockerfiles are also u
 | Frontend tests | 29 (Vitest) | `make test` |
 | Browser tests | 21 (Playwright), against a throwaway Docker system | `make e2e`; separate from `make test` |
 | Continuous integration | GitHub Actions, on every push to `main` and every pull request | `.github/workflows/ci.yml`: backend checks on a PostgreSQL 17 service, frontend and API-contract checks, and the spec-first check. It does **not** run the browser tests and does **not** gate the Cloud Build deploy |
-| Every feature | See the table at the end | "Features and their status" |
+| Every feature | See "Feature status" below | "Feature status" |
 
 The 21 browser tests cover: create, save and publish in one step, history, Restore, delete, Unpublish, the edit-conflict screen with "Resubmit", and (with a stand-in for the model) the streamed AI draft.
+
+## Feature status
+
+Status values: **Done**, **Partial**, **Not done**. *Done* means built and covered by automated tests; for features with a screen, the screen was also driven in a real browser (see "What was checked, and how"). For anything not done, the last column says how it would be built. The task numbers are in `specs/001-docs-studio/tasks.md`.
+
+| Feature | Status | If not done: how it would be built |
+|---|---|---|
+| Create and edit drafts, list, Markdown preview | Done | n/a |
+| Publish (atomic, immutable snapshot, first `published_at`) | Done | n/a |
+| Unpublish (keeps snapshots and `published_at`) | Done | n/a |
+| Version history, Restore, Delete (live version protected) | Done | n/a |
+| Conflict detection (`expected_draft_version`, 409) | Done | n/a |
+| Public list and article (live snapshot only; same 404) | Done | n/a |
+| Writer area protected by Basic authentication (required in production, off by default locally) | Done | n/a |
+| Optional: Idempotent Publish | Done | n/a |
+| Optional: Slug collision handling | Done | n/a |
+| Extra: AI body generation with Claude | Done and switched on for the deployed site; tested with a fake model | n/a |
+| Automated tests for every invariant (INV-1 to INV-6) | Done | n/a |
+| Continuous integration (GitHub Actions) | Done; does not run the browser tests and does not gate the deploy | n/a |
+| Local run with Docker Compose (`docker compose up --build`) | Done | n/a |
+| Cloud Run deployment (with automatic deploys from GitHub) | Done | n/a. It was built with `cloudbuild.yaml`, and Cloud SQL, Artifact Registry, Secret Manager and the service accounts were created by hand (low priority) |
 
 ## What was checked, and how
 
@@ -48,6 +69,19 @@ The 21 browser tests cover: create, save and publish in one step, history, Resto
 | The browser's own sign-in box | By hand | **No detailed record** |
 | The goal "first article published in under three minutes" | By hand | **No detailed record** |
 
+## Repository layout
+
+```text
+backend/        FastAPI API; the DDL is in db-automation-apply/
+frontend/       Next.js web app (public site and the writer area)
+specs/          Spec Kit artifacts for this feature
+docs/           Requirements and architecture
+scripts/        check-spec-first.sh
+.github/        GitHub Actions workflow (ci.yml)
+compose.yaml    Docker Compose for the local run (compose.e2e.yaml is for the browser tests)
+Makefile        make setup, dev, test, test-docker, e2e, check-spec-first
+```
+
 ## How the work was specified (spec first)
 
 The specification came before any implementation, using Spec Kit:
@@ -59,7 +93,7 @@ The specification came before any implementation, using Spec Kit:
 | Plan, research and data model | `specs/001-docs-studio/plan.md`, `research.md`, `data-model.md` |
 | API contract | `specs/001-docs-studio/contracts/openapi.yaml` |
 | Tasks, in build order | `specs/001-docs-studio/tasks.md` |
-| Requirements and architecture (English; Japanese in `docs/ja/`) | `docs/requirements.md`, `docs/nextjs-fastapi-architecture.html` |
+| Requirements and architecture | `docs/requirements.md`, `docs/nextjs-fastapi-architecture.html` |
 
 `scripts/check-spec-first.sh` (run it with `make check-spec-first`) verifies that `spec.md` was committed before any file under `backend/` or `frontend/`. History has not been rewritten.
 
@@ -130,34 +164,3 @@ Two tables (the DDL is `backend/db-automation-apply/001_schema.sql`; the explana
 | Who can use it | On the deployed site, only a signed-in writer, so the cost is limited to people who have the writer credentials |
 | Cost | About 2 to 3 cents a draft, capped by the prepaid credit on your account |
 | Tests | A fake model; the tests never call the API |
-
-## Features and their status
-
-Status values: **Done**, **Partial**, **Not done**. *Done* means built and covered by automated tests; for features with a screen, the screen was also driven in a real browser (see "What was checked, and how"). For anything not done, the last column says how it would be built. The task numbers are in `specs/001-docs-studio/tasks.md`.
-
-| Feature | Status | If not done: how it would be built |
-|---|---|---|
-| Create and edit drafts, list, Markdown preview | Done | n/a |
-| Publish (atomic, immutable snapshot, first `published_at`) | Done | n/a |
-| Unpublish (keeps snapshots and `published_at`) | Done | n/a |
-| Version history, Restore, Delete (live version protected) | Done | n/a |
-| Conflict detection (`expected_draft_version`, 409) | Done | n/a |
-| Public list and article (live snapshot only; same 404) | Done | n/a |
-| Writer area protected by Basic authentication (required in production, off by default locally) | Done | n/a |
-| Optional: Idempotent Publish | Done | n/a |
-| Optional: Slug collision handling | Done | n/a |
-| Extra: AI body generation with Claude | Done and switched on for the deployed site; tested with a fake model | n/a |
-| Automated tests for every invariant (INV-1 to INV-6) | Done | n/a |
-| Continuous integration (GitHub Actions) | Done; does not run the browser tests and does not gate the deploy | n/a |
-| Local run with Docker Compose (`docker compose up --build`) | Done | n/a |
-| Cloud Run deployment (with automatic deploys from GitHub) | Done | n/a. It was built with `cloudbuild.yaml`, and Cloud SQL, Artifact Registry, Secret Manager and the service accounts were created by hand (low priority) |
-
-## Repository layout
-
-```text
-backend/     FastAPI API; the DDL is in db-automation-apply/
-frontend/    Next.js web app (public site and the writer area)
-specs/       Spec Kit artifacts for this feature
-docs/        Requirements and architecture (English); docs/ja/ has the Japanese versions
-scripts/     check-spec-first.sh
-```

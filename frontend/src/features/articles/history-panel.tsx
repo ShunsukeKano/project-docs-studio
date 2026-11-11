@@ -5,12 +5,13 @@ import { useState, useTransition } from "react";
 import { getVersion } from "@/app/(studio)/studio/actions";
 import { Button } from "@/components/ui/button";
 import { TagList } from "@/components/ui/tag";
-import type { VersionDetail, VersionSummary } from "@/lib/api/types";
+import type { ArticleStatus, VersionDetail, VersionSummary } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 
 export function HistoryPanel({
   articleId,
+  status,
   versions,
   busy,
   onRestore,
@@ -18,6 +19,7 @@ export function HistoryPanel({
   onUnauthorized,
 }: {
   articleId: number;
+  status: ArticleStatus;
   versions: VersionSummary[];
   busy: boolean;
   onRestore: (versionNumber: number) => void;
@@ -27,6 +29,8 @@ export function HistoryPanel({
   const [opened, setOpened] = useState<VersionDetail | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, startLoading] = useTransition();
+  // After Unpublish the pointer is kept, so `is_live` stays true; the screen must not call it "Live".
+  const articleIsPublished = status === "published";
 
   function open(versionNumber: number) {
     setMessage(null);
@@ -60,14 +64,25 @@ export function HistoryPanel({
                 <p className="text-sm font-medium">
                   Version {version.version_number}
                   {version.is_live ? (
-                    <span className="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">
-                      Live
-                    </span>
+                    articleIsPublished ? (
+                      <span className="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success">
+                        Live
+                      </span>
+                    ) : (
+                      <span className="ml-2 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">
+                        Last published
+                      </span>
+                    )
                   ) : null}
                 </p>
                 <p className="truncate text-xs text-muted">
                   {version.title} · {formatDateTime(version.created_at)}
                 </p>
+                {version.is_live && !articleIsPublished ? (
+                  <p className="text-xs text-muted">
+                    The article is taken down. This version is kept, so it cannot be deleted.
+                  </p>
+                ) : null}
               </div>
               <div className="flex gap-1.5">
                 <Button variant="ghost" onClick={() => open(version.version_number)} disabled={loading}>
@@ -80,7 +95,13 @@ export function HistoryPanel({
                   variant="danger"
                   onClick={() => onDelete(version.version_number)}
                   disabled={busy || version.is_live}
-                  title={version.is_live ? "The live version is protected and cannot be deleted" : undefined}
+                  title={
+                    version.is_live
+                      ? articleIsPublished
+                        ? "The live version is protected and cannot be deleted"
+                        : "The last published version is kept after Unpublish and cannot be deleted"
+                      : undefined
+                  }
                 >
                   Delete
                 </Button>

@@ -263,6 +263,7 @@ export function ArticleWorkspace({
 
       <HistoryPanel
         articleId={saved.id}
+        status={saved.status}
         versions={versions}
         busy={busy}
         onRestore={restore}

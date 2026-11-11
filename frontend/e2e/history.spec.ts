@@ -58,6 +58,12 @@ test.describe("history, restore, delete, unpublish", () => {
     expect((await getArticle(request, article.id)).published_at).toBe(article.published_at);
     await expect(page.getByRole("button", { name: "Unpublish" })).toBeDisabled();
 
+    // The last published version is kept, so it stays undeletable, but it is no longer called "Live".
+    const kept = page.locator("li", { hasText: "Version 2" });
+    await expect(kept.getByText("Last published")).toBeVisible();
+    await expect(kept.getByText("Live", { exact: true })).toHaveCount(0);
+    await expect(kept.getByRole("button", { name: "Delete" })).toBeDisabled();
+
     // The draft equals the live snapshot, so publishing again creates nothing new and goes live again.
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "already live" })).toBeVisible();
